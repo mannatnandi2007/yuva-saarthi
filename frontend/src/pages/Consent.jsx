@@ -3,17 +3,39 @@
 
 import React, { useState } from 'react';
 import { ShieldCheck, Info, HeartHandshake, EyeOff, AlertTriangle } from 'lucide-react';
+import axios from 'axios';
 
-export default function Consent({ onAccept, onNavigate }) {
+export default function Consent({ userSession, onAccept, onNavigate }) {
   const [policyAck, setPolicyAck] = useState(false);
   const [generalConsent, setGeneralConsent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleProceed = () => {
-    if (policyAck && generalConsent) {
-      onAccept({
-        policy_ack_at: new Date().toISOString(),
-        consent_given_at: new Date().toISOString()
-      });
+  const handleProceed = async () => {
+    if (policyAck && generalConsent && userSession) {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const payload = {
+          phone: userSession.user_phone,
+          age_band: userSession.age_band,
+          consent_given: generalConsent,
+          policy_ack: policyAck,
+          emergency_contacts: userSession.emergency_contacts
+        };
+        
+        await axios.post('http://localhost:8000/auth/signup', payload);
+        
+        onAccept({
+          policy_ack_at: new Date().toISOString(),
+          consent_given_at: new Date().toISOString()
+        });
+      } catch (err) {
+        setError(err.response?.data?.detail || "Failed to initiate signup. Please try again.");
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -104,6 +126,12 @@ export default function Consent({ onAccept, onNavigate }) {
 
         </div>
 
+        {error && (
+          <div style={{ color: 'var(--danger)', marginBottom: '16px', textAlign: 'center', fontSize: '0.9rem' }}>
+            {error}
+          </div>
+        )}
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <button 
             onClick={() => onNavigate('signup')} 
@@ -114,16 +142,16 @@ export default function Consent({ onAccept, onNavigate }) {
           
           <button 
             onClick={handleProceed}
-            disabled={!policyAck || !generalConsent}
+            disabled={!policyAck || !generalConsent || loading}
             className="gradient-btn"
             style={{ 
               padding: '12px 24px', 
               borderRadius: '8px', 
-              opacity: (policyAck && generalConsent) ? 1 : 0.5,
-              cursor: (policyAck && generalConsent) ? 'pointer' : 'not-allowed'
+              opacity: (!policyAck || !generalConsent || loading) ? 0.5 : 1,
+              cursor: (!policyAck || !generalConsent || loading) ? 'not-allowed' : 'pointer'
             }}
           >
-            I Accept & Start Chatting
+            {loading ? 'Processing...' : 'I Accept & Continue'}
           </button>
         </div>
 

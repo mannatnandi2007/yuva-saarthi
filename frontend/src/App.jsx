@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import Signup from './pages/Signup.jsx';
 import Consent from './pages/Consent.jsx';
+import OtpVerification from './pages/OtpVerification.jsx';
 import Chat from './pages/Chat.jsx';
 import { Heart } from 'lucide-react';
 
@@ -19,6 +20,16 @@ export default function App() {
     setUserSession(prev => ({
       ...prev,
       ...consentTimestamps
+    }));
+    // After consent and API call succeeds, go to OTP
+    setCurrentPage('otp');
+  };
+
+  const handleOtpVerify = (sessionId) => {
+    setUserSession(prev => ({
+      ...prev,
+      session_id: sessionId,
+      is_verified: true
     }));
     setCurrentPage('chat');
   };
@@ -75,17 +86,31 @@ export default function App() {
           </button>
           <span style={{ color: 'var(--text-muted)' }}>&rarr;</span>
           <button 
-            onClick={() => handleNavigation('chat')}
+            onClick={() => handleNavigation('otp')}
             disabled={!userSession?.policy_ack_at}
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              color: currentPage === 'otp' ? 'var(--text-primary)' : 'var(--text-muted)',
+              fontWeight: currentPage === 'otp' ? 'bold' : 'normal',
+              cursor: userSession?.policy_ack_at ? 'pointer' : 'not-allowed'
+            }}
+          >
+            3. Verification
+          </button>
+          <span style={{ color: 'var(--text-muted)' }}>&rarr;</span>
+          <button 
+            onClick={() => handleNavigation('chat')}
+            disabled={!userSession?.is_verified}
             style={{ 
               background: 'none', 
               border: 'none', 
               color: currentPage === 'chat' ? 'var(--text-primary)' : 'var(--text-muted)',
               fontWeight: currentPage === 'chat' ? 'bold' : 'normal',
-              cursor: userSession?.policy_ack_at ? 'pointer' : 'not-allowed'
+              cursor: userSession?.is_verified ? 'pointer' : 'not-allowed'
             }}
           >
-            3. Chat Workspace
+            4. Chat Workspace
           </button>
         </div>
       </nav>
@@ -101,8 +126,17 @@ export default function App() {
         
         {currentPage === 'consent' && (
           <Consent 
+            userSession={userSession}
             onAccept={handleConsentAccept} 
             onNavigate={handleNavigation} 
+          />
+        )}
+
+        {currentPage === 'otp' && (
+          <OtpVerification 
+            userSession={userSession}
+            onVerify={handleOtpVerify}
+            onNavigate={handleNavigation}
           />
         )}
         
