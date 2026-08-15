@@ -4,6 +4,7 @@
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from app.supabase_client import supabase
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -19,23 +20,30 @@ class SignUpRequest(BaseModel):
     policy_ack: bool = Field(..., description="Ack of policy details")
     emergency_contacts: List[EmergencyContactSchema] = Field(..., max_items=3, min_items=1)
 
-@router.post("/signup", status_code=status.HTTP_201_CREATED)
+class VerifyRequest(BaseModel):
+    phone: str
+    otp_code: str
+    age_band: str
+    emergency_contacts: List[EmergencyContactSchema]
+
+@router.post("/signup", status_code=status.HTTP_200_OK)
 async def signup(payload: SignUpRequest):
     """
     Onboard a user with phone and emergency contacts.
-    TODO: Implement Supabase Auth phone-OTP trigger for user and emergency contact validation (PRD §3.1).
-    Validation warning logic:
-        - If only 'Sibling' or 'Friend' are added as contacts, return warning flag suggesting adding an adult.
+    Triggers Supabase Auth phone-OTP.
     """
     contact_relationships = [c.relationship for c in payload.emergency_contacts]
     has_adult = any(r in ["Parent", "Guardian", "Other"] for r in contact_relationships)
     
     warning = None
     if not has_adult:
-        # Soft validation prompt suggestion (PRD §3.1)
         warning = "For safety emergencies, having an adult contact can help us get you support faster — want to add one too?"
 
-    # Placeholder for database inserts into 'users' and 'emergency_contacts' tables
+    try:
+        response = supabase.auth.sign_in_with_otp({"phone": payload.phone})
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     return {
         "message": "Verification code sent to user phone",
         "phone": payload.phone,
@@ -43,12 +51,44 @@ async def signup(payload: SignUpRequest):
     }
 
 @router.post("/verify", status_code=status.HTTP_200_OK)
-async def verify_user_otp(phone: str, otp_code: str):
+async def verify_user_otp(payload: VerifyRequest):
     """
     Verify user OTP token using Supabase Auth.
-    TODO: Complete OTP validation checks (PRD §3.1).
+    On success, stores user and emergency contact details in the DB.
     """
-    return {
-        "status": "success",
-        "session_id": "dummy-session-id-token"
-    }
+    try:
+        res = supabase.auth.verify_otp({"phone": payload.phone, "token": payload.otp_code, "type": 'sms'})
+        user = res.user
+        if not user:
+            raise HTTPException(status_code=400, detail="Invalid OTP")
+            
+        # Store user in the custom users table
+        supabase.table("users").upsert({
+            "id": user.id,
+            "phone": payload.phone,
+            "age_band": payload.age_band
+        }).execute()
+        
+        # Clear existing contacts to prevent duplicates on re-verification
+        supabase.table("emergency_contacts").delete().eq("user_id", user.id).execute()
+        
+        # Store emergency contacts
+        contacts_data = [
+            {
+                "user_id": user.id,
+                "phone": c.phone,
+                "relationship": c.relationship,
+                "priority_order": c.priority_order
+            }
+            for c in payload.emergency_contacts
+        ]
+        if contacts_data:
+            supabase.table("emergency_contacts").insert(contacts_data).execute()
+            
+        return {
+            "status": "success",
+            "session_id": res.session.access_token
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
