@@ -20,6 +20,8 @@
 import logging
 from typing import Optional
 from dataclasses import dataclass
+from app.services.pre_filter import check_message_tripwire
+
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +103,46 @@ async def _mock_response(
     )
 
     text = user_message.lower()
+    # Yashika: Check high-risk keywords
+
+    triggered, matched_words, language = check_message_tripwire(user_message)
+    
+    if triggered:
+    
+        if any(word in matched_words for word in [
+            "suicide",
+            "kill myself",
+            "marna chahta",
+            "jaan de dunga",
+            "jaan de dungi"
+        ]):
+            return AIResponse(
+                reply="Main tumhari baat sun raha hoon. Please kisi trusted adult ya KIRAN Helpline (1800-599-0019) se baat karo.",
+                severity="high",
+                category="self_harm",
+                rationale=f"Keyword Tripwire detected: {matched_words}",
+            )
+    
+        if any(word in matched_words for word in [
+            "abuse",
+            "hit me",
+            "beat me",
+            "galat chhua",
+            "ghar wale marte"
+        ]):
+            return AIResponse(
+                reply="Tumhari safety important hai. Please Childline 1098 ya kisi trusted person se help lo.",
+                severity="high",
+                category="abuse",
+                rationale=f"Keyword Tripwire detected: {matched_words}",
+            )
+
+    return AIResponse(
+        reply="Main yahan hoon tumhari baat sunne ke liye.",
+        severity="medium",
+        category="distress",
+        rationale=f"Keyword Tripwire detected: {matched_words}",
+    )
 
     # Basic keyword triage so safety routing is testable end-to-end
     if any(kw in text for kw in ["suicide", "kill myself", "marna chahta", "jaan de"]):
