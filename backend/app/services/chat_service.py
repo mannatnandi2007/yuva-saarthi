@@ -21,13 +21,7 @@ from fastapi import HTTPException, status
 from app.supabase_client import supabase
 from app.services.llm_service import get_ai_response, AIResponse
 from app.schemas import MessageHistoryItem
-from app.services.pre_filter import check_message_tripwire
 
-# ---------------------------------------------------------------------------
-# Yashika (NLP) - Phase 2
-# Imported keyword tripwire to detect English and Hinglish crisis terms
-# before sending messages to the LLM.
-# ---------------------------------------------------------------------------
 
 logger = logging.getLogger(__name__)
 
@@ -235,19 +229,7 @@ async def send_chat_message(
     # Step 1: Ownership check — raises 403/404 if invalid
     session = validate_session_ownership(session_id, user_id)
     rolling_summary = session.get("summary_snapshot")
-    # ---------------------------------------------------------------------------
-    # Yashika (NLP) - Phase 2
-    # Run keyword tripwire before sending the message to the LLM.
-    # Detects English and Hinglish high-risk terms for safety monitoring.
-    # ---------------------------------------------------------------------------
-    triggered, matched_keywords, detected_language = check_message_tripwire(message)
     
-    logger.info(
-        "[PRE_FILTER] triggered=%s keywords=%s language=%s",
-        triggered,
-        matched_keywords,
-        detected_language,
-    )
     # Step 2: Persist the user's message
     save_message(
         session_id=session_id,
