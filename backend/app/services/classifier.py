@@ -1,3 +1,5 @@
+# YUVAA Saarthi Risk Classifier
+# Phase 5: False positive threshold tuning applied.
 import os
 import json
 import logging
@@ -8,6 +10,38 @@ from app.config import settings
 from app.services.pre_filter import check_message_tripwire
 
 logger = logging.getLogger(__name__)
+
+# =========================================================================
+# PHASE 5: FALSE POSITIVE GUARD LISTS
+# These patterns commonly appear in benign messages and should NOT trigger
+# high-severity classifications unless accompanied by stronger context.
+# =========================================================================
+
+# Phrases that, when the ENTIRE message is very short and matches one of
+# these, are likely benign. E.g. "can't take it anymore" about exam stress.
+BENIGN_CONTEXT_PHRASES: list = [
+    "can't take this exam",
+    "can't take the pressure",
+    "can't take school",
+    "can't take this class",
+    "hate my school",
+    "hate my marks",
+    "hate maths",
+    "help me please with",
+    "help me please in",
+    "help me with",
+    "hopeless about",
+    "hopeless at",
+    "nobody understands maths",
+    "nobody understands this subject",
+    "can't breathe because of exam",
+    "panic attacks during exam",
+    "falling apart because of marks",
+]
+
+# Minimum message length (words) to classify as 'medium' via tripwire alone.
+# Very short messages like 'sad' or 'help' should not auto-escalate.
+MIN_WORDS_FOR_MEDIUM_TRIPWIRE = 4
 
 # Structured JSON response shape forced by LangChain JSON mode/Function Calling (PRD §8)
 class RiskClassificationSchema(BaseModel):
@@ -117,7 +151,30 @@ def classify_message_risk(message: str, rolling_summary: Optional[str] = None) -
                 rationale=f"Tripwire detected abuse/violence indicators in {detected_lang}: {matched_words}"
             )
 
-        # Distress tripwire
+        # --- PHASE 5: False positive guard for distress tripwire ---
+        # Before flagging medium, check benign context and minimum message length
+        word_count = len(text_clean.split())
+        text_lower_full = text_clean.lower()
+
+        # If message is very short, don't over-classify from tripwire alone
+        if word_count < MIN_WORDS_FOR_MEDIUM_TRIPWIRE:
+            logger.debug("[FP GUARD] Short message (%d words) — downgrading tripwire to low.", word_count)
+            return RiskClassificationSchema(
+                severity="low",
+                category="distress",
+                rationale=f"Short message with distress signal ({detected_lang}). Insufficient context for medium escalation."
+            )
+
+        # If message matches a known benign-context phrase, downgrade to low
+        if any(phrase in text_lower_full for phrase in BENIGN_CONTEXT_PHRASES):
+            logger.debug("[FP GUARD] Benign context phrase matched — downgrading to low.")
+            return RiskClassificationSchema(
+                severity="low",
+                category="distress",
+                rationale="Distress signal detected in likely academic/contextual (non-crisis) context."
+            )
+
+        # Distress tripwire — medium classification
         return RiskClassificationSchema(
             severity="medium",
             category="distress",
@@ -127,15 +184,33 @@ def classify_message_risk(message: str, rolling_summary: Optional[str] = None) -
     # Step 2: Multi-provider LLM classification (Gemini with auto-failover to Groq Cloud)
     llm_result = _call_llm_classifier(text_clean, rolling_summary)
     if llm_result:
+        # PHASE 5: Validate LLM result — prevent over-classification on benign phrases
+        if llm_result.severity == "high" and llm_result.category != "abuse":
+            # Require at least one high-risk term to be present for LLM-driven HIGH
+            high_risk_anchor_terms = [
+                "suicide", "kill myself", "want to die", "hurt myself", "end my life",
+                "end it all", "overdose", "jaan de", "marna chahta", "mar jaunga",
+                "zindagi khatam", "zehar kha"
+            ]
+            has_anchor = any(term in text_lower for term in high_risk_anchor_terms)
+            if not has_anchor:
+                logger.debug("[FP GUARD] LLM returned HIGH but no anchor term found — downgrading to medium.")
+                llm_result = RiskClassificationSchema(
+                    severity="medium",
+                    category=llm_result.category,
+                    rationale=llm_result.rationale + " (Threshold guard: no explicit high-risk anchor term found.)"
+                )
         return llm_result
 
     # Step 3: Heuristic evaluation for mild/low distress indicators
+    # PHASE 5: Tightened list — only include terms with strong emotional signal
     mild_distress_words = [
-        "sad", "upset", "crying", "anxious", "nervous", "stressed", "lonely",
-        "low", "confused", "scared", "tired of everything", "darr lag raha",
-        "rona aa raha", "tension", "akela"
+        "sad", "crying", "anxious", "stressed", "lonely",
+        "scared", "tired of everything", "darr lag raha",
+        "rona aa raha", "akela"
     ]
-    if any(w in text_lower for w in mild_distress_words):
+    # PHASE 5: Require the message to have some minimum length for low-distress flag
+    if len(text_clean.split()) >= 3 and any(w in text_lower for w in mild_distress_words):
         return RiskClassificationSchema(
             severity="low",
             category="distress",

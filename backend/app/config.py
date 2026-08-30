@@ -16,9 +16,16 @@ class Settings(BaseSettings):
     llm_api_key: Optional[str] = None
     gemini_api_key: Optional[str] = None
     groq_api_key: Optional[str] = None
-    
-    # Telephony Integrations (Bland AI Voice Escalation)
+
+    # Telephony: Bland AI voice escalation (NOT Twilio)
+    # All Bland AI integration tasks owned by Mannat
     bland_ai_key: Optional[str] = None
+
+    # JWT Secret for signing custom session tokens (BUG-003 fix)
+    # Generate a strong secret: python -c "import secrets; print(secrets.token_hex(32))"
+    jwt_secret: str = "yuvaa-saarthi-default-dev-secret-change-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_hours: int = 72
 
     # Dev Bypass
     dev_bypass_auth: bool = False
@@ -31,3 +38,4 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
+

@@ -5,7 +5,8 @@ import React, { useState } from 'react';
 import { User, Phone, Users, ShieldAlert, Plus, Trash2, AlertCircle, ArrowRight, Sparkles, Heart } from 'lucide-react';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000';
+// BUG-010 FIX: Use VITE_API_URL env variable for production deployments (Vercel)
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export default function Signup({ onComplete, onNavigate }) {
   const [isLoginMode, setIsLoginMode] = useState(false);

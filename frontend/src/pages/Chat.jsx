@@ -9,7 +9,9 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000';
+// BUG-010 FIX: Use VITE_API_URL env variable for production deployments (Vercel)
+// Set VITE_API_URL=https://your-backend.railway.app in Vercel environment variables
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const SUGGESTED_PROMPTS = [
   { label: "Exam Stress", text: "Exams ko lekar bohot zyada stress aur pressure feel ho raha hai." },

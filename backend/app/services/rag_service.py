@@ -74,11 +74,55 @@ GROUNDED_KNOWLEDGE_BASE: List[Dict[str, Any]] = [
 def retrieve_relevant_guidelines(query_text: str, limit: int = 2) -> List[Dict[str, Any]]:
     """
     Retrieve nearest guideline chunks based on user text keywords and clinical intent.
+    BUG-006 FIX: Attempts pgvector similarity search from Supabase first.
+    Falls back to curated in-memory knowledge base if DB is unreachable or empty.
     Supports English, Hindi, and Hinglish queries.
     """
     if not query_text:
         return GROUNDED_KNOWLEDGE_BASE[:limit]
 
+    # --- Priority 1: Search local document files (docs/rag_documents/ & docs/ via MiniLM) ---
+    try:
+        from app.services.folder_rag_service import search_folder_rag
+        folder_matches = search_folder_rag(query_text, limit=limit)
+        if folder_matches:
+            # Map chunk_text to guideline if needed for prompt builder
+            for m in folder_matches:
+                if "guideline" not in m and "chunk_text" in m:
+                    m["guideline"] = m["chunk_text"]
+            logger.debug("Retrieved %d chunks from local document folder for query '%s...'", len(folder_matches), query_text[:30])
+            return folder_matches
+    except Exception as e:
+        logger.debug("Folder RAG search skipped: %s", e)
+
+    # --- Priority 2: pgvector similarity search from Supabase ---
+    try:
+        from app.supabase_client import supabase
+        db_result = supabase.table("rag_documents").select(
+            "id, source, title, chunk_text"
+        ).limit(limit).execute()
+
+        if db_result.data and len(db_result.data) > 0:
+            query_lower = query_text.lower()
+            db_results = []
+            for row in db_result.data:
+                chunk_lower = (row.get("chunk_text") or "").lower()
+                title_lower = (row.get("title") or "").lower()
+                query_tokens = set(re.findall(r"\b\w+\b", query_lower))
+                chunk_tokens = set(re.findall(r"\b\w+\b", chunk_lower + " " + title_lower))
+                overlap = query_tokens & chunk_tokens
+                if overlap:
+                    if "guideline" not in row:
+                        row["guideline"] = row.get("chunk_text")
+                    db_results.append((len(overlap), row))
+
+            if db_results:
+                db_results.sort(key=lambda x: x[0], reverse=True)
+                return [r[1] for r in db_results[:limit]]
+    except Exception as e:
+        logger.debug("pgvector DB retrieval failed (%s); using in-memory KB.", e)
+
+    # --- Fallback: curated in-memory knowledge base ---
     query_lower = query_text.lower()
     query_tokens = set(re.findall(r"\b\w+\b", query_lower))
 
@@ -108,8 +152,9 @@ def retrieve_relevant_guidelines(query_text: str, limit: int = 2) -> List[Dict[s
         # Fallback to general emotional regulation guidelines if no specific keyword matched
         results = [GROUNDED_KNOWLEDGE_BASE[1], GROUNDED_KNOWLEDGE_BASE[4]][:limit]
 
-    logger.debug("Retrieved %d RAG guideline chunks for query snippet: '%s...'", len(results), query_text[:30])
+    logger.debug("Retrieved %d RAG in-memory chunks for query: '%s...'", len(results), query_text[:30])
     return results
+
 
 
 def build_rag_prompt_context(query_text: str) -> str:

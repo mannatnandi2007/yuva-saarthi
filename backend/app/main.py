@@ -3,13 +3,13 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, chat, risk, escalation, rag, users
+from app.routers import auth, chat, risk, escalation, rag, users, demo
 from app.config import settings
 
 app = FastAPI(
     title="YUVAA Saarthi Backend API",
     description="Youth well-being companion with safety-routing, crisis escalation, and Hinglish language support.",
-    version="1.0.0"
+    version="1.1.0"
 )
 
 # CORS middleware for React frontend integration
@@ -21,13 +21,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register endpoints routers
+# Register endpoint routers
 app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(risk.router)
 app.include_router(escalation.router)
 app.include_router(rag.router)
 app.include_router(users.router)
+app.include_router(demo.router)  # Phase 5: Demo script integration
 
 @app.get("/")
 async def read_root():

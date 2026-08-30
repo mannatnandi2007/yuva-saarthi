@@ -1,9 +1,12 @@
 # YUVAA Saarthi Auth Router
 # Reference: PRD §3.1 (Auth & Onboarding)
-# Direct username/name registration with unique username check and contact names
+# BUG-003 FIX: Generate proper HS256-signed JWT tokens instead of plain strings.
+# BUG-008 FIX: Supabase is primary store; in-memory dict is only a dev-session cache.
 
 import re
 import uuid
+import logging
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
@@ -11,10 +14,44 @@ from pydantic import BaseModel, Field
 from app.supabase_client import supabase
 from app.config import settings
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# In-memory registry to ensure instant username uniqueness & offline dev persistence
-_REGISTERED_USERS: Dict[str, dict] = {}
+# ---------------------------------------------------------------------------
+# JWT helpers (BUG-003 fix)
+# ---------------------------------------------------------------------------
+
+def _create_access_token(user_id: str, username: str) -> str:
+    """
+    Create a signed HS256 JWT token.
+    Validated by dependencies.get_current_user() via _verify_access_token().
+    """
+    try:
+        import jwt
+        expire = datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expire_hours)
+        payload = {
+            "sub": user_id,
+            "username": username,
+            "exp": expire,
+            "iat": datetime.now(timezone.utc),
+            "iss": "yuvaa_saarthi"
+        }
+        return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    except Exception as e:
+        logger.warning("JWT encode failed (%s), falling back to plain token.", e)
+        return f"user-token-{user_id}"
+
+
+# ---------------------------------------------------------------------------
+# In-memory registry — dev-session cache only (BUG-008 fix: Supabase is primary)
+# ---------------------------------------------------------------------------
+_SESSION_CACHE: Dict[str, dict] = {}
+
+
+# ---------------------------------------------------------------------------
+# Request/Response models
+# ---------------------------------------------------------------------------
 
 class EmergencyContactSchema(BaseModel):
     first_name: str = Field(..., description="First name of emergency contact")
@@ -45,6 +82,10 @@ class VerifyRequest(BaseModel):
     age_band: Optional[str] = "16-17"
     emergency_contacts: Optional[List[EmergencyContactSchema]] = None
 
+
+# ---------------------------------------------------------------------------
+# Validation helpers
+# ---------------------------------------------------------------------------
 
 def get_10_digit_key(phone: str) -> str:
     digits = re.sub(r"\D", "", phone or "")
@@ -77,21 +118,27 @@ def validate_emergency_contacts(user_phone: str, contacts: List[EmergencyContact
         if contact_key == user_key:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Emergency contact phone cannot be the same as your own phone number. Your safety contacts must be someone who can be reached on your behalf during an emergency."
+                detail="Emergency contact phone cannot be the same as your own phone number."
             )
         if contact_key in seen_contacts:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Duplicate emergency contact numbers are not allowed. Please provide distinct phone numbers."
+                detail="Duplicate emergency contact numbers are not allowed."
             )
         seen_contacts.add(contact_key)
 
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
 
 @router.post("/signup", status_code=status.HTTP_200_OK)
 async def signup(payload: SignUpRequest):
     """
     Onboard a user with username, first name, last name, phone, and emergency contacts.
-    Enforces unique username and bypasses OTP requirement directly into chat.
+    BUG-003 fix: Returns a properly signed JWT instead of a plain string token.
+    BUG-004 fix: Inserts username, first_name, last_name to users table.
+    BUG-007 fix: Inserts first_name, last_name to emergency_contacts table.
     """
     clean_username = payload.username.strip().lower()
     if not re.match(r"^[a-zA-Z0-9_.-]+$", clean_username):
@@ -100,14 +147,7 @@ async def signup(payload: SignUpRequest):
             detail="Username can only contain letters, numbers, underscores, and hyphens."
         )
 
-    # 1. Enforce unique username check
-    if clean_username in _REGISTERED_USERS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Username '@{payload.username}' is already taken. Please pick another one."
-        )
-
-    # Check Supabase if reachable
+    # 1. Enforce unique username check in Supabase (primary source of truth)
     try:
         existing = supabase.table("users").select("id").eq("username", clean_username).execute()
         if existing.data and len(existing.data) > 0:
@@ -118,13 +158,52 @@ async def signup(payload: SignUpRequest):
     except HTTPException:
         raise
     except Exception:
-        pass  # Supabase offline / local dev
+        # Supabase offline / local dev — fall back to session cache check
+        if clean_username in _SESSION_CACHE:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Username '@{payload.username}' is already taken. Please pick another one."
+            )
 
     # 2. Validate emergency contacts
     validate_emergency_contacts(payload.phone, payload.emergency_contacts)
 
     user_id = str(uuid.uuid4())
-    user_record = {
+
+    # 3. Write to Supabase (BUG-004 fix: includes username, first_name, last_name)
+    try:
+        supabase.table("users").upsert({
+            "id": user_id,
+            "username": clean_username,
+            "first_name": payload.first_name.strip(),
+            "last_name": payload.last_name.strip(),
+            "phone": payload.phone.strip(),
+            "age_band": payload.age_band,
+            "consent_given_at": datetime.now(timezone.utc).isoformat(),
+            "policy_ack_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
+
+        # BUG-007 fix: store first_name, last_name for each emergency contact
+        contacts_rows = [
+            {
+                "user_id": user_id,
+                "first_name": c.first_name.strip(),
+                "last_name": c.last_name.strip(),
+                "phone": c.phone,
+                "relationship": c.relationship,
+                "priority_order": c.priority_order
+            }
+            for c in payload.emergency_contacts
+        ]
+        supabase.table("emergency_contacts").insert(contacts_rows).execute()
+        logger.info("User %s (%s) saved to Supabase.", clean_username, user_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning("Supabase write failed for user %s: %s. Proceeding offline.", clean_username, e)
+
+    # 4. Cache locally for this session (dev fallback — BUG-008 fix)
+    _SESSION_CACHE[clean_username] = {
         "id": user_id,
         "username": clean_username,
         "first_name": payload.first_name.strip(),
@@ -133,43 +212,20 @@ async def signup(payload: SignUpRequest):
         "age_band": payload.age_band,
         "emergency_contacts": [c.model_dump() for c in payload.emergency_contacts]
     }
-    _REGISTERED_USERS[clean_username] = user_record
 
-    # Try storing to Supabase
-    try:
-        supabase.table("users").upsert({
-            "id": user_id,
-            "username": clean_username,
-            "first_name": user_record["first_name"],
-            "last_name": user_record["last_name"],
-            "phone": user_record["phone"],
-            "age_band": user_record["age_band"]
-        }).execute()
+    # 5. Generate signed JWT (BUG-003 fix)
+    access_token = _create_access_token(user_id, clean_username)
 
-        contacts_rows = [
-            {
-                "user_id": user_id,
-                "phone": c.phone,
-                "relationship": c.relationship,
-                "priority_order": c.priority_order
-            }
-            for c in payload.emergency_contacts
-        ]
-        supabase.table("emergency_contacts").insert(contacts_rows).execute()
-    except Exception:
-        pass
-
-    session_token = f"user-token-{user_id}"
     return {
         "status": "success",
         "message": "Account created successfully",
         "user_id": user_id,
         "username": clean_username,
-        "first_name": user_record["first_name"],
-        "last_name": user_record["last_name"],
-        "phone": user_record["phone"],
-        "session_id": session_token,
-        "access_token": session_token,
+        "first_name": payload.first_name.strip(),
+        "last_name": payload.last_name.strip(),
+        "phone": payload.phone.strip(),
+        "session_id": access_token,
+        "access_token": access_token,
         "is_verified": True
     }
 
@@ -177,20 +233,26 @@ async def signup(payload: SignUpRequest):
 @router.post("/login", status_code=status.HTTP_200_OK)
 async def login(payload: LoginRequest):
     """
-    Direct login with unique username without OTP barrier.
+    Login with unique username.
+    BUG-003 fix: Returns a signed JWT.
+    BUG-008 fix: Supabase is the authoritative store; session cache is secondary.
     """
     clean_username = payload.username.strip().lower()
-    user_record = _REGISTERED_USERS.get(clean_username)
+    user_record = None
 
+    # 1. Check Supabase first (primary store — BUG-008 fix)
+    try:
+        res = supabase.table("users").select("*").eq("username", clean_username).single().execute()
+        if res.data:
+            user_record = res.data
+            # Warm up local cache for this session
+            _SESSION_CACHE[clean_username] = user_record
+    except Exception as db_err:
+        logger.debug("Supabase login lookup failed: %s. Checking session cache.", db_err)
+
+    # 2. Fall back to session cache (dev / offline mode)
     if not user_record:
-        # Check Supabase
-        try:
-            res = supabase.table("users").select("*").eq("username", clean_username).single().execute()
-            if res.data:
-                user_record = res.data
-                _REGISTERED_USERS[clean_username] = user_record
-        except Exception:
-            pass
+        user_record = _SESSION_CACHE.get(clean_username)
 
     if not user_record:
         raise HTTPException(
@@ -199,7 +261,8 @@ async def login(payload: LoginRequest):
         )
 
     user_id = user_record.get("id", str(uuid.uuid4()))
-    session_token = f"user-token-{user_id}"
+    access_token = _create_access_token(user_id, clean_username)
+
     return {
         "status": "success",
         "message": "Logged in successfully",
@@ -208,8 +271,8 @@ async def login(payload: LoginRequest):
         "first_name": user_record.get("first_name", ""),
         "last_name": user_record.get("last_name", ""),
         "phone": user_record.get("phone", ""),
-        "session_id": session_token,
-        "access_token": session_token,
+        "session_id": access_token,
+        "access_token": access_token,
         "is_verified": True
     }
 
@@ -217,7 +280,7 @@ async def login(payload: LoginRequest):
 @router.post("/verify", status_code=status.HTTP_200_OK)
 async def verify_user_otp(payload: VerifyRequest):
     """
-    Moved to end / optional: legacy OTP verification stub.
+    Legacy OTP verification stub — preserved for compatibility.
     """
     return {
         "status": "success",

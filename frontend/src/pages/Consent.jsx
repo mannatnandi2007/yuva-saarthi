@@ -3,7 +3,6 @@
 
 import React, { useState } from 'react';
 import { ShieldCheck, Info, HeartHandshake, EyeOff, AlertTriangle } from 'lucide-react';
-import axios from 'axios';
 
 export default function Consent({ userSession, onAccept, onNavigate }) {
   const [policyAck, setPolicyAck] = useState(false);
@@ -11,31 +10,13 @@ export default function Consent({ userSession, onAccept, onNavigate }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const handleProceed = async () => {
-    if (policyAck && generalConsent && userSession) {
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const payload = {
-          phone: userSession.user_phone,
-          age_band: userSession.age_band,
-          consent_given: generalConsent,
-          policy_ack: policyAck,
-          emergency_contacts: userSession.emergency_contacts
-        };
-        
-        await axios.post('http://localhost:8000/auth/signup', payload);
-        
-        onAccept({
-          policy_ack_at: new Date().toISOString(),
-          consent_given_at: new Date().toISOString()
-        });
-      } catch (err) {
-        setError(err.response?.data?.detail || "Failed to initiate signup. Please try again.");
-      } finally {
-        setLoading(false);
-      }
+  const handleProceed = () => {
+    if (policyAck && generalConsent) {
+      // User has already signed up in Signup.jsx; proceed directly to chat
+      onAccept({
+        policy_ack_at: new Date().toISOString(),
+        consent_given_at: new Date().toISOString()
+      });
     }
   };
 

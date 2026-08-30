@@ -1,22 +1,26 @@
-# YUVAA Saarthi Escalation Router
+# YUVAA Saarthi — Escalation Router
 # Reference: PRD §3.4 (Emergency contact alert system) & §3.4a (Abuse-routing safeguard)
+# Bland AI is the telephony provider (not Twilio).
+# Phase 3: Sequential Voice Escalation Loop & alert_attempts logging owned by Mannat.
 
 import logging
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
-from app.services.bland_ai import trigger_bland_ai_call
+from app.services.bland_ai import trigger_sequential_escalation
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/escalation", tags=["escalation"])
+
 
 class EmergencyContactInput(BaseModel):
     phone: str
     relationship: str = "Parent"
     name: str = "Emergency Contact"
     priority_order: int = 1
+
 
 class EscalationTriggerRequest(BaseModel):
     user_id: str
@@ -27,25 +31,28 @@ class EscalationTriggerRequest(BaseModel):
     contact_relationship: Optional[str] = "Parent"
     contact_name: Optional[str] = "Emergency Contact"
     contacts: Optional[List[EmergencyContactInput]] = None
+    stop_on_first_answer: Optional[bool] = True
+
 
 @router.post("/trigger", status_code=status.HTTP_200_OK)
 async def trigger_escalation(payload: EscalationTriggerRequest):
     """
-    Trigger emergency contacts escalation sequence (PRD §3.4).
-    
+    Trigger emergency contact escalation sequence (PRD §3.4 & §3.4a).
+    Phase 3: Implements sequential retry loop across all 3 priority contacts (Mannat).
+
     CRITICAL SAFETY ENFORCEMENT:
       - If category == 'abuse' and severity == 'high' (PRD §3.4a):
         Hard short-circuit. Personal contacts are strictly NOT contacted.
-        Action is logged as 'routed_to_helpline'.
-      - For self_harm / distress:
-        Dispatches voice call to primary emergency contact via Bland AI pathway.
+        Action logged as 'routed_to_helpline'. Childline 1098 & KIRAN surfaced.
+      - For self_harm / distress (high severity):
+        Dispatches voice call sequentially to emergency contacts (priority 1 -> 2 -> 3)
+        via Bland AI (Twilio is NOT used).
+        Each attempt is logged to the alert_attempts DB table.
     """
     severity = payload.severity.lower()
     category = payload.category.lower()
 
-    # =========================================================================
-    # RULE §3.4a: CRITICAL ABUSE BYPASS
-    # =========================================================================
+    # Rule §3.4a: Abuse Bypass Safeguard
     if severity == "high" and category == "abuse":
         logger.warning(
             "[ESCALATION SAFEGUARD §3.4a] Abuse detected for user %s. "
@@ -56,47 +63,34 @@ async def trigger_escalation(payload: EscalationTriggerRequest):
             "action_taken": "routed_to_helpline",
             "category": "abuse",
             "call_dispatched": False,
+            "total_attempts": 0,
+            "attempts": [],
             "details": (
                 "Rule §3.4a active: Personal emergency contacts bypassed completely "
                 "to protect user safety. In-app helplines Childline 1098 & KIRAN 1800-599-0019 surfaced."
             )
         }
 
-    # =========================================================================
-    # STANDARD ESCALATION FLOW (§3.4): BLAND AI VOICE CALL TO PRIORITY CONTACT
-    # =========================================================================
-    target_phone = payload.contact_phone
-    target_rel = payload.contact_relationship or "Parent"
-    target_name = payload.contact_name or "Emergency Contact"
-    priority = 1
+    # Normalize contacts payload if provided
+    contacts_list = None
+    if payload.contacts:
+        contacts_list = [c.model_dump() for c in payload.contacts]
+    elif payload.contact_phone:
+        contacts_list = [{
+            "phone": payload.contact_phone,
+            "relationship": payload.contact_relationship or "Parent",
+            "name": payload.contact_name or "Emergency Contact",
+            "priority_order": 1
+        }]
 
-    # If list of contacts provided, select priority 1
-    if not target_phone and payload.contacts:
-        sorted_contacts = sorted(payload.contacts, key=lambda c: c.priority_order)
-        primary = sorted_contacts[0]
-        target_phone = primary.phone
-        target_rel = primary.relationship
-        target_name = primary.name
-        priority = primary.priority_order
-
-    if not target_phone:
-        target_phone = "+919876543211"  # Default safe simulation phone if not specified
-
-    # Dispatch Bland AI pathway call
-    call_result = trigger_bland_ai_call(
-        phone_number=target_phone,
-        contact_name=target_name,
-        relationship=target_rel,
+    # Execute sequential escalation loop
+    result = trigger_sequential_escalation(
         user_id=payload.user_id,
-        priority_order=priority
+        risk_event_id=payload.risk_event_id,
+        category=category,
+        severity=severity,
+        contacts=contacts_list,
+        stop_on_first_answer=payload.stop_on_first_answer if payload.stop_on_first_answer is not None else True,
     )
 
-    return {
-        "status": "escalation_triggered",
-        "action_taken": "call_placed",
-        "category": category,
-        "call_dispatched": True,
-        "call_details": call_result,
-        "details": f"Voice call dispatched to priority #{priority} contact ({target_rel}) via Bland AI pathway."
-    }
-
+    return result
