@@ -1,26 +1,35 @@
-// YUVAA Saarthi Signup Page with Multi-Contact Configuration & Safety Validation
-// Reference: PRD §3.1 (Auth & Onboarding) & Safety Escalation Rules
+// YUVAA Saarthi — Modern Aesthetic Onboarding & Login
+// Redesigned with strict 10-digit Indian phone inputs, fixed +91 prefix, and dark glassmorphism
 
 import React, { useState } from 'react';
-import { User, Phone, Users, ShieldAlert, Plus, Trash2, AlertCircle } from 'lucide-react';
+import { User, Phone, Users, ShieldAlert, Plus, Trash2, AlertCircle, ArrowRight, Sparkles, Heart } from 'lucide-react';
+import axios from 'axios';
+
+const API_BASE_URL = 'http://localhost:8000';
 
 export default function Signup({ onComplete, onNavigate }) {
-  const [userPhone, setUserPhone] = useState('');
-  const [ageBand, setAgeBand] = useState('');
+  const [isLoginMode, setIsLoginMode] = useState(false);
+  const [loginUsername, setLoginUsername] = useState('');
+
+  // Sign up state - phone stores pure 10 digits
+  const [username, setUsername] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [userPhone, setUserPhone] = useState(''); // exactly 10 digits
+  const [ageBand, setAgeBand] = useState('16-17');
   const [error, setError] = useState(null);
-  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Array of emergency contacts (max 3, min 1)
   const [contacts, setContacts] = useState([
-    { phone: '', relationship: 'Parent', priority_order: 1 }
+    { first_name: '', last_name: '', phone: '', relationship: 'Parent', priority_order: 1 }
   ]);
-
-  const normalizePhone = (num) => (num || '').replace(/[^\d+]/g, '');
 
   const addContact = () => {
     if (contacts.length < 3) {
       setContacts([
         ...contacts,
-        { phone: '', relationship: 'Guardian', priority_order: contacts.length + 1 }
+        { first_name: '', last_name: '', phone: '', relationship: 'Guardian', priority_order: contacts.length + 1 }
       ]);
     }
   };
@@ -39,350 +48,617 @@ export default function Signup({ onComplete, onNavigate }) {
     setError(null);
   };
 
-  // Check if contact phone matches user's own phone
+  // 10-digit exact matching checks
   const doesMatchUserPhone = (contactPhone) => {
-    const cleanUser = normalizePhone(userPhone);
-    const cleanContact = normalizePhone(contactPhone);
-    return cleanUser.length >= 7 && cleanContact.length >= 7 && cleanUser === cleanContact;
+    return userPhone.length === 10 && contactPhone.length === 10 && userPhone === contactPhone;
   };
 
-  // Check if contact phone is duplicated across contacts
   const isDuplicateContactPhone = (contactPhone, currentIndex) => {
-    const cleanContact = normalizePhone(contactPhone);
-    if (cleanContact.length < 7) return false;
-    return contacts.some((c, i) => i !== currentIndex && normalizePhone(c.phone) === cleanContact);
+    if (contactPhone.length !== 10) return false;
+    return contacts.some((c, i) => i !== currentIndex && c.phone === contactPhone);
   };
 
-  // Soft Validation Check (PRD §3.1)
-  const isOnlyPeerContacts = () => {
-    if (contacts.length === 0) return false;
-    return contacts.every(c => c.relationship === 'Sibling' || c.relationship === 'Friend');
+  const handleDirectLogin = async (e) => {
+    e.preventDefault();
+    setError(null);
+    const clean = loginUsername.trim().toLowerCase();
+    if (!clean) {
+      setError("Please enter your username.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await axios.post(`${API_BASE_URL}/auth/login`, { username: clean });
+      if (res.data?.status === 'success') {
+        onComplete(res.data);
+        onNavigate('chat');
+      }
+    } catch (err) {
+      const msg = err.response?.data?.detail || "Could not find account. Please check username or create an account.";
+      setError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const validateForm = () => {
-    const cleanUser = normalizePhone(userPhone);
-    const userDigits = cleanUser.replace(/\D/g, '');
+  const handleSignupSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
 
-    if (!userPhone.trim() || userDigits.length < 7) {
-      return "Please enter a valid phone number for yourself (at least 10 digits).";
+    const cleanUsername = username.trim().toLowerCase();
+    if (!cleanUsername || cleanUsername.length < 3) {
+      setError("Username must be at least 3 characters long.");
+      return;
+    }
+    if (!/^[a-zA-Z0-9_.-]+$/.test(cleanUsername)) {
+      setError("Username can only contain letters, numbers, hyphens, and underscores.");
+      return;
+    }
+    if (!firstName.trim()) {
+      setError("Please enter your first name.");
+      return;
+    }
+    if (!lastName.trim()) {
+      setError("Please enter your last name.");
+      return;
     }
 
-    if (!ageBand) {
-      return "Please select your age band.";
-    }
-
-    if (contacts.length === 0) {
-      return "Please provide at least one emergency contact.";
+    if (userPhone.length !== 10) {
+      setError("Please enter your 10-digit mobile number.");
+      return;
     }
 
     const seenContacts = new Set();
     for (let i = 0; i < contacts.length; i++) {
       const c = contacts[i];
-      const cleanContact = normalizePhone(c.phone);
-      const contactDigits = cleanContact.replace(/\D/g, '');
-
-      if (!c.phone.trim() || contactDigits.length < 7) {
-        return `Please enter a valid phone number for emergency contact #${i + 1} (${c.relationship}).`;
+      if (!c.first_name.trim()) {
+        setError(`Please enter the first name for emergency contact #${i + 1}.`);
+        return;
+      }
+      if (!c.last_name.trim()) {
+        setError(`Please enter the last name for emergency contact #${i + 1}.`);
+        return;
       }
 
-      if (cleanUser === cleanContact) {
-        return `Emergency contact #${i + 1} (${c.relationship}) cannot be your own phone number. In a crisis, your safety contact is notified on your behalf.`;
+      if (c.phone.length !== 10) {
+        setError(`Please enter a valid 10-digit mobile number for ${c.first_name} (Contact #${i + 1}).`);
+        return;
       }
 
-      if (seenContacts.has(cleanContact)) {
-        return `Emergency contact #${i + 1} has a duplicate number. Each contact must have a distinct phone number.`;
+      if (userPhone === c.phone) {
+        setError(`Emergency contact #${i + 1} (${c.first_name}) cannot be your own phone number.`);
+        return;
       }
 
-      seenContacts.add(cleanContact);
+      if (seenContacts.has(c.phone)) {
+        setError(`Emergency contact #${i + 1} has a duplicate mobile number.`);
+        return;
+      }
+      seenContacts.add(c.phone);
     }
 
-    return null;
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const validationErr = validateForm();
-    if (validationErr) {
-      setError(validationErr);
-      return;
-    }
-
-    setError(null);
-    // Store user data state and transition to Consent screen
-    onComplete({
-      user_phone: userPhone.trim(),
+    setIsSubmitting(true);
+    const payload = {
+      username: cleanUsername,
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+      phone: `+91${userPhone}`,
       age_band: ageBand,
-      emergency_contacts: contacts.map(c => ({ ...c, phone: c.phone.trim() }))
-    });
-    onNavigate('consent');
+      consent_given: true,
+      policy_ack: true,
+      emergency_contacts: contacts.map(c => ({
+        first_name: c.first_name.trim(),
+        last_name: c.last_name.trim(),
+        relationship: c.relationship,
+        phone: `+91${c.phone}`,
+        priority_order: c.priority_order
+      }))
+    };
+
+    try {
+      const res = await axios.post(`${API_BASE_URL}/auth/signup`, payload);
+      if (res.data?.status === 'success') {
+        onComplete(res.data);
+        onNavigate('consent');
+      }
+    } catch (err) {
+      const msg = err.response?.data?.detail || "Registration failed. Please try again.";
+      setError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div style={{ maxWidth: '640px', margin: '40px auto', padding: '20px' }} className="animate-slideup">
-      <div className="glass-container" style={{ padding: '36px' }}>
+    <div style={{ width: '100%', maxWidth: '560px', margin: '0 auto' }} className="animate-slideup">
+      <div className="glass-panel" style={{ padding: '36px 32px', position: 'relative', overflow: 'hidden' }}>
         
-        <header style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <h1 style={{ fontSize: '2.2rem', fontWeight: '800' }}>
-            Get Started with <span className="gradient-text">YUVAA Saarthi</span>
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', marginTop: '6px' }}>Onboard securely using OTP-verification</p>
-        </header>
+        {/* Subtle decorative glow */}
+        <div style={{
+          position: 'absolute',
+          top: '-80px',
+          right: '-80px',
+          width: '200px',
+          height: '200px',
+          background: 'radial-gradient(circle, rgba(168, 85, 247, 0.15) 0%, transparent 70%)',
+          pointerEvents: 'none'
+        }} />
 
-        {/* Safety Promise Copy (PRD §3.1) */}
-        <div style={{ 
-          background: 'rgba(99, 102, 241, 0.06)', 
-          borderLeft: '4px solid var(--accent-indigo)', 
-          padding: '16px', 
-          borderRadius: '8px', 
-          marginBottom: '28px',
-          fontSize: '0.9rem',
-          color: 'var(--text-secondary)'
-        }}>
-          <strong>Safety Promise:</strong> Your chats are private. If we ever detect signs of a real safety emergency, we'll contact your emergency contacts — because your safety comes first.
+        {/* Card Header */}
+        <div style={{ marginBottom: '22px' }}>
+          <h2 style={{ fontSize: '1.45rem', fontWeight: '800', letterSpacing: '-0.02em', marginBottom: '6px', color: '#f4f4f5' }}>
+            {isLoginMode ? "Welcome Back" : "Create Safe Account"}
+          </h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', lineHeight: '1.4' }}>
+            {isLoginMode 
+              ? "Sign in with your unique username to resume your confidential conversations."
+              : "Set up your youth profile and trusted emergency safety contacts."}
+          </p>
         </div>
 
+        {/* Segmented Tab Switcher */}
+        <div style={{
+          display: 'flex',
+          background: 'rgba(255, 255, 255, 0.04)',
+          border: '1px solid rgba(255, 255, 255, 0.06)',
+          borderRadius: '12px',
+          padding: '4px',
+          marginBottom: '24px'
+        }}>
+          <button
+            type="button"
+            onClick={() => { setIsLoginMode(false); setError(null); }}
+            style={{
+              flex: 1,
+              padding: '9px 14px',
+              borderRadius: '9px',
+              border: 'none',
+              background: !isLoginMode ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'transparent',
+              color: !isLoginMode ? '#ffffff' : 'var(--text-secondary)',
+              fontSize: '0.86rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              boxShadow: !isLoginMode ? '0 2px 8px rgba(99, 102, 241, 0.3)' : 'none',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            Create Account
+          </button>
+          <button
+            type="button"
+            onClick={() => { setIsLoginMode(true); setError(null); }}
+            style={{
+              flex: 1,
+              padding: '9px 14px',
+              borderRadius: '9px',
+              border: 'none',
+              background: isLoginMode ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'transparent',
+              color: isLoginMode ? '#ffffff' : 'var(--text-secondary)',
+              fontSize: '0.86rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              boxShadow: isLoginMode ? '0 2px 8px rgba(99, 102, 241, 0.3)' : 'none',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            Sign In with Username
+          </button>
+        </div>
+
+        {/* Error Notification */}
         {error && (
           <div style={{
-            background: 'rgba(239, 68, 68, 0.08)',
-            border: '1px solid var(--danger)',
-            color: 'var(--danger)',
-            padding: '12px 16px',
-            borderRadius: '8px',
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            borderRadius: '10px',
+            padding: '12px 14px',
             marginBottom: '20px',
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
-            fontSize: '0.88rem'
+            color: '#fca5a5',
+            fontSize: '0.84rem',
+            lineHeight: '1.4'
           }} className="animate-slideup">
-            <AlertCircle size={18} style={{ flexShrink: 0 }} />
+            <AlertCircle size={17} style={{ flexShrink: 0, color: '#f87171' }} />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
-          {/* User phone & Ageband */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '600' }}>
-                Your Phone (OTP-verified)
+        {/* ========================================================================= */}
+        {/* TAB 1: SIGN IN WITH USERNAME                                              */}
+        {/* ========================================================================= */}
+        {isLoginMode ? (
+          <form onSubmit={handleDirectLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                Enter Your Username
               </label>
-              <div style={{ position: 'relative' }}>
-                <Phone size={16} style={{ position: 'absolute', left: '12px', top: '14px', color: 'var(--text-muted)' }} />
-                <input 
-                  type="tel" 
-                  placeholder="+91 98765 43210"
-                  required
-                  value={userPhone}
-                  onChange={(e) => {
-                    setUserPhone(e.target.value);
-                    setError(null);
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                background: 'var(--bg-input)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '10px',
+                padding: '0 14px',
+                transition: 'border-color 0.2s'
+              }}>
+                <span style={{ color: 'var(--accent-purple)', fontWeight: '700', marginRight: '8px', fontSize: '1rem' }}>@</span>
+                <input
+                  type="text"
+                  placeholder="e.g. mannat_n"
+                  value={loginUsername}
+                  onChange={(e) => setLoginUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))}
+                  style={{
+                    flex: 1,
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    color: 'var(--text-primary)',
+                    padding: '12px 0',
+                    fontSize: '0.92rem',
+                    fontFamily: 'inherit'
                   }}
-                  className="form-input" 
-                  style={{ width: '100%', paddingLeft: '38px' }}
+                  autoFocus
                 />
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '600' }}>
-                Age Band
-              </label>
-              <select 
-                required
-                value={ageBand}
-                onChange={(e) => {
-                  setAgeBand(e.target.value);
-                  setError(null);
-                }}
-                className="form-input" 
-                style={{ width: '100%', height: '45px', cursor: 'pointer' }}
-              >
-                <option value="">Select Age Band</option>
-                <option value="under-13">Under 13</option>
-                <option value="13-15">13 - 15</option>
-                <option value="16-17">16 - 17</option>
-                <option value="18-plus">18+</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Emergency contacts configuration */}
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Users size={18} style={{ color: 'var(--accent-purple)' }} />
-                <h2 style={{ fontSize: '1.2rem', fontWeight: '700' }}>Emergency Safety Contacts</h2>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="btn-primary"
+              style={{ width: '100%', padding: '13px', fontSize: '0.95rem' }}
+            >
+              <span>{isSubmitting ? "Opening Workspace..." : "Open Safe Space"}</span>
+              <ArrowRight size={17} />
+            </button>
+          </form>
+        ) : (
+          /* ========================================================================= */
+          /* TAB 2: CREATE ACCOUNT                                                     */
+          /* ========================================================================= */
+          <form onSubmit={handleSignupSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+            
+            {/* Section 1: Profile */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: '14px',
+              padding: '18px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#c084fc', fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                <User size={14} />
+                <span>Your Profile</span>
               </div>
-              
-              {contacts.length < 3 && (
-                <button 
-                  type="button" 
-                  onClick={addContact}
-                  style={{ 
-                    background: 'rgba(168, 85, 247, 0.1)', 
-                    border: '1px solid var(--accent-purple)', 
-                    color: 'var(--accent-purple)', 
-                    borderRadius: '6px', 
-                    padding: '6px 12px', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '4px',
-                    cursor: 'pointer',
-                    fontSize: '0.8rem'
-                  }}
-                >
-                  <Plus size={14} /> Add Contact
-                </button>
-              )}
+
+              {/* Username */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', marginBottom: '6px', color: 'var(--text-secondary)' }}>
+                  Choose a Unique Username *
+                </label>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: '10px',
+                  padding: '0 12px'
+                }}>
+                  <span style={{ color: '#c084fc', fontWeight: '700', marginRight: '6px' }}>@</span>
+                  <input
+                    type="text"
+                    placeholder="e.g. mannat_24"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))}
+                    style={{
+                      flex: 1,
+                      background: 'transparent',
+                      border: 'none',
+                      outline: 'none',
+                      color: 'var(--text-primary)',
+                      padding: '10px 0',
+                      fontSize: '0.88rem',
+                      fontFamily: 'inherit'
+                    }}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* First & Last Name */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', marginBottom: '6px', color: 'var(--text-secondary)' }}>
+                    First Name *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="First Name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="input-field"
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', marginBottom: '6px', color: 'var(--text-secondary)' }}>
+                    Last Name *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Last Name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="input-field"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Phone (with fixed +91 and 10 digits max) & Age Band */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', marginBottom: '6px', color: 'var(--text-secondary)' }}>
+                    Mobile Number (10 digits) *
+                  </label>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    background: 'var(--bg-input)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '10px',
+                    padding: '0 10px'
+                  }}>
+                    <span style={{
+                      fontSize: '0.84rem',
+                      fontWeight: '700',
+                      color: 'var(--text-secondary)',
+                      marginRight: '8px',
+                      paddingRight: '8px',
+                      borderRight: '1px solid rgba(255, 255, 255, 0.1)',
+                      userSelect: 'none'
+                    }}>
+                      +91
+                    </span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={10}
+                      placeholder="98765 43210"
+                      value={userPhone}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setUserPhone(digits);
+                      }}
+                      style={{
+                        flex: 1,
+                        background: 'transparent',
+                        border: 'none',
+                        outline: 'none',
+                        color: 'var(--text-primary)',
+                        padding: '10px 0',
+                        fontSize: '0.88rem',
+                        fontFamily: 'inherit',
+                        letterSpacing: '0.04em'
+                      }}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', marginBottom: '6px', color: 'var(--text-secondary)' }}>
+                    Age Band *
+                  </label>
+                  <select
+                    value={ageBand}
+                    onChange={(e) => setAgeBand(e.target.value)}
+                    className="input-field"
+                  >
+                    <option value="under-13">Under 13</option>
+                    <option value="13-15">13 - 15</option>
+                    <option value="16-17">16 - 17</option>
+                    <option value="18-plus">18 - 20</option>
+                  </select>
+                </div>
+              </div>
             </div>
 
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
-              Add up to 3 trusted contacts. In a crisis escalation, they will be notified in priority order. <em>Your emergency contact must be someone else, not your own number.</em>
-            </p>
+            {/* Section 2: Emergency Contacts */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: '14px',
+              padding: '18px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2dd4bf', fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  <Users size={14} />
+                  <span>Trusted Emergency Contacts</span>
+                </div>
+                {contacts.length < 3 && (
+                  <button
+                    type="button"
+                    onClick={addContact}
+                    className="btn-secondary"
+                  >
+                    <Plus size={13} />
+                    <span>Add</span>
+                  </button>
+                )}
+              </div>
 
-            {/* List of Contacts */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {contacts.map((contact, index) => {
-                const isMatchUser = doesMatchUserPhone(contact.phone);
+                const matchesUser = doesMatchUserPhone(contact.phone);
                 const isDuplicate = isDuplicateContactPhone(contact.phone, index);
-                const hasConflict = isMatchUser || isDuplicate;
+                const hasError = matchesUser || isDuplicate;
 
                 return (
-                  <div 
+                  <div
                     key={index}
-                    style={{ 
-                      background: hasConflict ? 'rgba(239, 68, 68, 0.05)' : 'rgba(255,255,255,0.02)', 
-                      border: `1px solid ${hasConflict ? 'var(--danger)' : 'rgba(255,255,255,0.05)'}`, 
-                      borderRadius: '8px', 
-                      padding: '16px',
-                      position: 'relative',
-                      transition: 'border-color 0.2s ease'
+                    style={{
+                      background: 'rgba(0, 0, 0, 0.3)',
+                      border: `1px solid ${hasError ? 'rgba(239, 68, 68, 0.4)' : 'rgba(255, 255, 255, 0.06)'}`,
+                      borderRadius: '12px',
+                      padding: '14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px'
                     }}
                   >
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr auto', gap: '12px', alignItems: 'flex-start' }}>
-                      
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ fontSize: '0.75rem', color: hasConflict ? 'var(--danger)' : 'var(--text-muted)', fontWeight: '600' }}>
-                          Contact Phone Number
-                        </span>
-                        <input 
-                          type="tel" 
-                          placeholder="+91 98765 43211"
-                          required
-                          value={contact.phone}
-                          onChange={(e) => updateContact(index, 'phone', e.target.value)}
-                          className="form-input"
-                          style={{ 
-                            padding: '8px 12px',
-                            borderColor: hasConflict ? 'var(--danger)' : undefined
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{
+                        fontSize: '0.74rem',
+                        fontWeight: '700',
+                        color: index === 0 ? '#c084fc' : '#a1a1aa',
+                        background: index === 0 ? 'rgba(168, 85, 247, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        letterSpacing: '0.03em'
+                      }}>
+                        {index === 0 ? "Priority 1 (Primary Contact)" : `Priority ${contact.priority_order}`}
+                      </span>
+
+                      {contacts.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeContact(index)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#71717a',
+                            cursor: 'pointer',
+                            padding: '2px',
+                            display: 'flex',
+                            alignItems: 'center'
                           }}
-                        />
-                        {isMatchUser && (
-                          <span style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '2px', fontWeight: '500' }}>
-                            ⚠️ Cannot be your own phone number
-                          </span>
-                        )}
-                        {isDuplicate && (
-                          <span style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '2px', fontWeight: '500' }}>
-                            ⚠️ Duplicate: already listed for another contact
-                          </span>
-                        )}
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600' }}>Relationship</span>
-                        <select
-                          value={contact.relationship}
-                          onChange={(e) => updateContact(index, 'relationship', e.target.value)}
-                          className="form-input"
-                          style={{ padding: '8px 12px', height: '40px' }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = '#71717a'}
                         >
-                          <option value="Parent">Parent</option>
-                          <option value="Guardian">Guardian</option>
-                          <option value="Sibling">Sibling</option>
-                          <option value="Friend">Friend</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', justifyContent: 'center' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', fontWeight: '600' }}>Priority</span>
-                        <div style={{ 
-                          background: 'var(--bg-tertiary)', 
-                          padding: '8px 14px', 
-                          borderRadius: '6px', 
-                          fontWeight: 'bold', 
-                          color: 'var(--accent-indigo)',
-                          textAlign: 'center'
-                        }}>
-                          #{contact.priority_order}
-                        </div>
-                      </div>
-
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
 
-                    {contacts.length > 1 && (
-                      <button 
-                        type="button" 
-                        onClick={() => removeContact(index)}
-                        style={{ 
-                          position: 'absolute', 
-                          right: '-10px', 
-                          top: '-10px', 
-                          background: 'var(--danger)', 
-                          border: 'none', 
-                          borderRadius: '50%', 
-                          width: '24px', 
-                          height: '24px', 
-                          display: 'flex', 
-                          justifyContent: 'center', 
-                          alignItems: 'center', 
-                          cursor: 'pointer',
-                          color: '#fff'
-                        }}
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    )}
+                    {/* Contact Names */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <input
+                        type="text"
+                        placeholder="Contact First Name"
+                        value={contact.first_name}
+                        onChange={(e) => updateContact(index, 'first_name', e.target.value)}
+                        className="input-field"
+                        style={{ fontSize: '0.84rem', padding: '9px 12px' }}
+                        required
+                      />
+                      <input
+                        type="text"
+                        placeholder="Contact Last Name"
+                        value={contact.last_name}
+                        onChange={(e) => updateContact(index, 'last_name', e.target.value)}
+                        className="input-field"
+                        style={{ fontSize: '0.84rem', padding: '9px 12px' }}
+                        required
+                      />
+                    </div>
 
+                    {/* Relationship & Phone with +91 fixed badge and 10 digits max */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: '10px' }}>
+                      <select
+                        value={contact.relationship}
+                        onChange={(e) => updateContact(index, 'relationship', e.target.value)}
+                        className="input-field"
+                        style={{ fontSize: '0.84rem', padding: '9px 10px' }}
+                      >
+                        <option value="Parent">Parent</option>
+                        <option value="Guardian">Guardian</option>
+                        <option value="Sibling">Sibling</option>
+                        <option value="Friend">Friend</option>
+                        <option value="Other">Other</option>
+                      </select>
+
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        background: 'var(--bg-input)',
+                        border: `1px solid ${hasError ? '#ef4444' : 'var(--border-subtle)'}`,
+                        borderRadius: '10px',
+                        padding: '0 8px'
+                      }}>
+                        <span style={{
+                          fontSize: '0.8rem',
+                          fontWeight: '700',
+                          color: 'var(--text-secondary)',
+                          marginRight: '6px',
+                          paddingRight: '6px',
+                          borderRight: '1px solid rgba(255, 255, 255, 0.1)',
+                          userSelect: 'none'
+                        }}>
+                          +91
+                        </span>
+                        <input
+                          type="tel"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={10}
+                          placeholder="98765 43210"
+                          value={contact.phone}
+                          onChange={(e) => {
+                            const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                            updateContact(index, 'phone', digits);
+                          }}
+                          style={{
+                            flex: 1,
+                            background: 'transparent',
+                            border: 'none',
+                            outline: 'none',
+                            color: 'var(--text-primary)',
+                            padding: '9px 0',
+                            fontSize: '0.84rem',
+                            fontFamily: 'inherit',
+                            letterSpacing: '0.04em'
+                          }}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {matchesUser && (
+                      <div style={{ color: '#f87171', fontSize: '0.74rem', fontWeight: '500' }}>
+                        ⚠️ Cannot be your own phone number.
+                      </div>
+                    )}
+                    {isDuplicate && (
+                      <div style={{ color: '#f87171', fontSize: '0.74rem', fontWeight: '500' }}>
+                        ⚠️ Duplicate contact phone number.
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
 
-            {/* Soft non-blocking peer contact validation box (PRD §3.1) */}
-            {isOnlyPeerContacts() && (
-              <div 
-                className="animate-slideup"
-                style={{ 
-                  background: 'rgba(245, 158, 11, 0.08)', 
-                  border: '1px solid rgba(245, 158, 11, 0.2)', 
-                  padding: '12px 16px', 
-                  borderRadius: '8px', 
-                  marginTop: '16px',
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '12px'
-                }}
-              >
-                <ShieldAlert size={20} style={{ color: 'var(--warning)', flexShrink: 0 }} />
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-                  <strong>Nudge:</strong> For safety emergencies, having an adult contact can help us get you support faster — want to add one too? (You can still proceed if you prefer).
-                </p>
-              </div>
-            )}
-          </div>
-
-          <button 
-            type="submit" 
-            className="gradient-btn" 
-            style={{ width: '100%', padding: '14px', borderRadius: '8px', fontSize: '1rem', marginTop: '12px' }}
-          >
-            Continue to Consent & Policy Acknowledgment
-          </button>
-
-        </form>
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="btn-primary"
+              style={{ width: '100%', padding: '14px', fontSize: '0.95rem' }}
+            >
+              <span>{isSubmitting ? "Creating Profile..." : "Continue to Safe Space"}</span>
+              <ArrowRight size={17} />
+            </button>
+          </form>
+        )}
 
       </div>
     </div>

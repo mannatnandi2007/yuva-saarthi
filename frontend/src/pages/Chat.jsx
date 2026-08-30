@@ -374,10 +374,10 @@ export default function Chat({ userSession, onLogout }) {
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: '0.82rem', fontWeight: '600', color: '#f4f4f5', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {displayPhone}
+                {userSession?.username ? `@${userSession.username}` : (userSession?.first_name ? `${userSession.first_name} ${userSession.last_name}` : displayPhone)}
               </div>
               <div style={{ fontSize: '0.72rem', color: '#71717a' }}>
-                Verified Account
+                {userSession?.first_name ? `${userSession.first_name} ${userSession.last_name}` : 'Verified Profile'}
               </div>
             </div>
           </div>

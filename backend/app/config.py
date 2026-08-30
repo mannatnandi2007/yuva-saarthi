@@ -17,11 +17,8 @@ class Settings(BaseSettings):
     gemini_api_key: Optional[str] = None
     groq_api_key: Optional[str] = None
     
-    # Telephony Integrations
+    # Telephony Integrations (Bland AI Voice Escalation)
     bland_ai_key: Optional[str] = None
-    twilio_account_sid: Optional[str] = None
-    twilio_auth_token: Optional[str] = None
-    twilio_phone_number: Optional[str] = None
 
     # Dev Bypass
     dev_bypass_auth: bool = False

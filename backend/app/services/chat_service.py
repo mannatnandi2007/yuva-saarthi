@@ -295,14 +295,14 @@ async def send_chat_message(
 def _derive_action_taken(severity: str, category: str) -> str:
     """
     Map risk classification to the action_taken_type DB enum string.
-    Full escalation state machine (Twilio SMS + Bland AI calls) is Phase 3.
+    Full escalation state machine (Bland AI automated voice calls) is Phase 3.
     For now, just return the correct enum value so the contract is established.
     """
     if severity == "high" and category == "abuse":
         return "routed_to_helpline"
     elif severity == "high":
-        # Phase 3 will actually fire Twilio/Bland AI here
-        return "logged_only"  # Will become "call_placed" / "sms_sent" in Phase 3
+        # Phase 3 fires Bland AI voice call here
+        return "logged_only"  # Will become "call_placed" in Phase 3
     elif severity == "medium":
         return "logged_only"
     else:

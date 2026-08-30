@@ -21,7 +21,7 @@ export default function App() {
       ...prev,
       ...consentTimestamps
     }));
-    setCurrentPage('otp');
+    setCurrentPage('chat'); // Direct entry into ChatGPT workspace
   };
 
   const handleOtpVerify = (sessionId) => {

@@ -397,12 +397,21 @@ class TestSwaggerDocs:
 class TestSignupValidation:
     def test_signup_rejects_contact_with_same_number_as_user(self):
         payload = {
+            "username": "user_conflict",
+            "first_name": "Test",
+            "last_name": "User",
             "phone": "+919876543210",
             "age_band": "16-17",
             "consent_given": True,
             "policy_ack": True,
             "emergency_contacts": [
-                {"phone": "+919876543210", "relationship": "Parent", "priority_order": 1}
+                {
+                    "first_name": "Dad",
+                    "last_name": "User",
+                    "phone": "+919876543210", 
+                    "relationship": "Parent", 
+                    "priority_order": 1
+                }
             ]
         }
         resp = client.post("/auth/signup", json=payload)
@@ -411,31 +420,77 @@ class TestSignupValidation:
 
     def test_signup_rejects_duplicate_contacts(self):
         payload = {
+            "username": "user_dup",
+            "first_name": "Test",
+            "last_name": "User",
             "phone": "+919876543210",
             "age_band": "16-17",
             "consent_given": True,
             "policy_ack": True,
             "emergency_contacts": [
-                {"phone": "+919876543211", "relationship": "Parent", "priority_order": 1},
-                {"phone": "+919876543211", "relationship": "Guardian", "priority_order": 2}
+                {
+                    "first_name": "Mom",
+                    "last_name": "User",
+                    "phone": "+919876543211", 
+                    "relationship": "Parent", 
+                    "priority_order": 1
+                },
+                {
+                    "first_name": "Dad",
+                    "last_name": "User",
+                    "phone": "+919876543211", 
+                    "relationship": "Guardian", 
+                    "priority_order": 2
+                }
             ]
         }
         resp = client.post("/auth/signup", json=payload)
         assert resp.status_code == 400
         assert "Duplicate emergency contact numbers" in resp.json()["detail"]
 
-    def test_signup_accepts_distinct_contacts(self):
+    def test_signup_accepts_distinct_contacts_and_unique_username(self):
         payload = {
+            "username": "unique_student_1",
+            "first_name": "Aarav",
+            "last_name": "Sharma",
             "phone": "+919876543210",
             "age_band": "16-17",
             "consent_given": True,
             "policy_ack": True,
             "emergency_contacts": [
-                {"phone": "+919876543211", "relationship": "Parent", "priority_order": 1}
+                {
+                    "first_name": "Rajesh",
+                    "last_name": "Sharma",
+                    "phone": "+919876543211", 
+                    "relationship": "Parent", 
+                    "priority_order": 1
+                }
             ]
         }
         resp = client.post("/auth/signup", json=payload)
         assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "success"
+        assert data["username"] == "unique_student_1"
+        assert data["first_name"] == "Aarav"
+
+        # Try signing up with same username -> must fail 400
+        resp_dup = client.post("/auth/signup", json=payload)
+        assert resp_dup.status_code == 400
+        assert "already taken" in resp_dup.json()["detail"]
+
+    def test_login_with_registered_username(self):
+        # Log in with the previously registered username
+        resp = client.post("/auth/login", json={"username": "unique_student_1"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "success"
+        assert data["username"] == "unique_student_1"
+
+    def test_login_rejects_unknown_username(self):
+        resp = client.post("/auth/login", json={"username": "ghost_user_99999"})
+        assert resp.status_code == 404
+
 
 
 # ===========================================================================

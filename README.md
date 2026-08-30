@@ -9,7 +9,7 @@
    - **Keyword Pre-filter**: A dual-list (English and Hinglish) regex/keyword safety tripwire for instant triage.
    - **LLM Structured Classifier**: Sequential LangChain-orchestrated pipeline mapping every input to a strict classification shape: `{"severity": "none|low|medium|high", "category": "self_harm|abuse|distress|none", "rationale": "..."}`.
 4. **Abuse-Aware Emergency Contact Escalation**:
-   - For **High** severity risk (except `abuse`): parallel SMS notification to all emergency contacts + priority-ordered phone calling using Bland AI pathways.
+   - For **High** severity risk (except `abuse`): priority-ordered phone calling using Bland AI conversational pathways.
    - For **High** severity `abuse` category: bypasses all personal contacts completely to avoid putting the teen in direct danger, routes user to Childline 1098 / KIRAN helplines, and logs action as `routed_to_helpline`.
 5. **RAG-based Grounding**: Excerpts from WHO, NIMHANS, and ICMR stored in a PostgreSQL database using the `pgvector` extension.
 
@@ -17,8 +17,8 @@
 - **Frontend**: React (Vite, single-page web app) styled with custom premium dark-mode CSS.
 - **Backend**: FastAPI (Python) web server.
 - **Database / Auth**: Supabase Postgres DB with pgvector support + phone OTP Auth.
-- **LLM/Orchestration**: Gemini/Claude models coordinated with LangChain sequential pipelines.
-- **Crisis Call/SMS**: Bland AI conversational pathways for phone calls, Twilio for SMS alerts.
+- **LLM/Orchestration**: Gemini/Claude/Groq models coordinated with LangChain sequential pipelines.
+- **Crisis Telephony**: Bland AI conversational pathways for automated priority phone calls.
 - **Hosting**: Vercel (Frontend), Railway or Render (Backend).
 
 ## Repository Layout
