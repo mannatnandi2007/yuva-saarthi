@@ -388,3 +388,51 @@ class TestSwaggerDocs:
     def test_swagger_ui_loads(self):
         resp = client.get("/docs")
         assert resp.status_code == 200
+
+
+# ===========================================================================
+# 10. Signup validation (emergency contact matching & duplicates)
+# ===========================================================================
+
+class TestSignupValidation:
+    def test_signup_rejects_contact_with_same_number_as_user(self):
+        payload = {
+            "phone": "+919876543210",
+            "age_band": "16-17",
+            "consent_given": True,
+            "policy_ack": True,
+            "emergency_contacts": [
+                {"phone": "+919876543210", "relationship": "Parent", "priority_order": 1}
+            ]
+        }
+        resp = client.post("/auth/signup", json=payload)
+        assert resp.status_code == 400
+        assert "cannot be the same as your own phone number" in resp.json()["detail"]
+
+    def test_signup_rejects_duplicate_contacts(self):
+        payload = {
+            "phone": "+919876543210",
+            "age_band": "16-17",
+            "consent_given": True,
+            "policy_ack": True,
+            "emergency_contacts": [
+                {"phone": "+919876543211", "relationship": "Parent", "priority_order": 1},
+                {"phone": "+919876543211", "relationship": "Guardian", "priority_order": 2}
+            ]
+        }
+        resp = client.post("/auth/signup", json=payload)
+        assert resp.status_code == 400
+        assert "Duplicate emergency contact numbers" in resp.json()["detail"]
+
+    def test_signup_accepts_distinct_contacts(self):
+        payload = {
+            "phone": "+919876543210",
+            "age_band": "16-17",
+            "consent_given": True,
+            "policy_ack": True,
+            "emergency_contacts": [
+                {"phone": "+919876543211", "relationship": "Parent", "priority_order": 1}
+            ]
+        }
+        resp = client.post("/auth/signup", json=payload)
+        assert resp.status_code == 200

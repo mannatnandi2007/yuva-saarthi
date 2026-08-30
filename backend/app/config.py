@@ -4,6 +4,9 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
+from dotenv import load_dotenv
+load_dotenv()
+
 class Settings(BaseSettings):
     # Supabase Setup
     supabase_url: str = "https://placeholder.supabase.co"
@@ -17,6 +20,9 @@ class Settings(BaseSettings):
     twilio_account_sid: Optional[str] = None
     twilio_auth_token: Optional[str] = None
     twilio_phone_number: Optional[str] = None
+
+    # Dev Bypass
+    dev_bypass_auth: bool = False
 
     # Settings configurations to read from .env if present
     model_config = SettingsConfigDict(

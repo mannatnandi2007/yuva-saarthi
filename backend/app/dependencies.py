@@ -64,6 +64,8 @@ async def get_current_user(
     if dev_bypass:
         if x_dev_user_id:
             return AuthenticatedUser(user_id=x_dev_user_id)
+        if authorization and "dev-" in authorization:
+            return AuthenticatedUser(user_id="00000000-0000-0000-0000-000000000001")
         # Even in dev mode, still fall through to real auth if no bypass header
 
     # -----------------------------------------------------------------------

@@ -29,6 +29,7 @@ export default function App() {
     setUserSession(prev => ({
       ...prev,
       session_id: sessionId,
+      access_token: sessionId,
       is_verified: true
     }));
     setCurrentPage('chat');
@@ -101,13 +102,12 @@ export default function App() {
           <span style={{ color: 'var(--text-muted)' }}>&rarr;</span>
           <button 
             onClick={() => handleNavigation('chat')}
-            disabled={!userSession?.is_verified}
             style={{ 
               background: 'none', 
               border: 'none', 
               color: currentPage === 'chat' ? 'var(--text-primary)' : 'var(--text-muted)',
               fontWeight: currentPage === 'chat' ? 'bold' : 'normal',
-              cursor: userSession?.is_verified ? 'pointer' : 'not-allowed'
+              cursor: 'pointer'
             }}
           >
             4. Chat Workspace

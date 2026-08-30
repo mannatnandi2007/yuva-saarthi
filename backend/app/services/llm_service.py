@@ -106,45 +106,49 @@ async def _mock_response(
     # Yashika: Check high-risk keywords
 
     triggered, matched_words, language = check_message_tripwire(user_message)
+    matched_words_lower = [w.lower() for w in matched_words]
     
     if triggered:
-    
-        if any(word in matched_words for word in [
-            "suicide",
-            "kill myself",
-            "marna chahta",
-            "jaan de dunga",
-            "jaan de dungi"
-        ]):
+        # Check high-severity self-harm tripwires
+        self_harm_keywords = [
+            "suicide", "kill myself", "marna chahta", "jaan de dunga", "jaan de dungi",
+            "want to die", "hurt myself", "cut my wrist", "slit my wrist", "end my life",
+            "overdose", "suicide karna", "apne aap ko nuksan", "marna chahti",
+            "mar jaunga", "mar jaungi", "zindagi khatam", "zehar kha", "marna", "jaan de"
+        ]
+        if any(any(k in w for k in self_harm_keywords) for w in matched_words_lower) or any(k in text for k in ["suicide", "kill myself", "marna chahta", "jaan de"]):
             return AIResponse(
-                reply="Main tumhari baat sun raha hoon. Please kisi trusted adult ya KIRAN Helpline (1800-599-0019) se baat karo.",
+                reply="Main tumhari baat sun raha hoon. Please kisi trusted adult ya KIRAN Helpline (1800-599-0019) se baat karo. You are not alone.",
                 severity="high",
                 category="self_harm",
-                rationale=f"Keyword Tripwire detected: {matched_words}",
+                rationale=f"Keyword Tripwire detected self-harm: {matched_words}",
             )
     
-        if any(word in matched_words for word in [
-            "abuse",
-            "hit me",
-            "beat me",
-            "galat chhua",
-            "ghar wale marte"
-        ]):
+        # Check high-severity abuse tripwires (triggers Rule §3.4a bypass)
+        abuse_keywords = [
+            "abuse", "hit me", "beat me", "galat chhua", "ghar wale marte",
+            "domestic violence", "hitting me", "beating me", "sexual assault",
+            "molested", "touched me", "papa maarte", "mummy maarti", "mummy papa marte",
+            "bhaiya maarte", "gali dete", "pitai", "roz maarte", "pitte hai",
+            "galat touch", "marte hai", "beating"
+        ]
+        if any(any(k in w for k in abuse_keywords) for w in matched_words_lower) or any(k in text for k in ["abuse", "marte hai", "beating", "hit me"]):
             return AIResponse(
-                reply="Tumhari safety important hai. Please Childline 1098 ya kisi trusted person se help lo.",
+                reply="Tumhari safety humare liye sabse important hai. Aapki privacy protected hai aur personal contacts ko contact nahi kiya jayega. Please Childline 1098 ya KIRAN 1800-599-0019 se help lo.",
                 severity="high",
                 category="abuse",
-                rationale=f"Keyword Tripwire detected: {matched_words}",
+                rationale=f"Keyword Tripwire detected abuse: {matched_words}",
             )
 
-    return AIResponse(
-        reply="Main yahan hoon tumhari baat sunne ke liye.",
-        severity="medium",
-        category="distress",
-        rationale=f"Keyword Tripwire detected: {matched_words}",
-    )
+        # Matched other tripwires (distress terms)
+        return AIResponse(
+            reply="Main yahan hoon tumhari baat sunne ke liye. Tension mat lo, baat karo.",
+            severity="medium",
+            category="distress",
+            rationale=f"Keyword Tripwire detected distress: {matched_words}",
+        )
 
-    # Basic keyword triage so safety routing is testable end-to-end
+    # Basic keyword triage fallback so safety routing is always testable
     if any(kw in text for kw in ["suicide", "kill myself", "marna chahta", "jaan de"]):
         return AIResponse(
             reply=(
@@ -168,16 +172,24 @@ async def _mock_response(
             rationale="[MOCK] Abuse keyword detected in message.",
         )
 
-    # Default: normal conversational response
-    return AIResponse(
-        reply=(
-            "I understand yaar. Sometimes things can feel overwhelming. "
+    # Default: normal conversational response with Hinglish mirroring (PRD §3.6)
+    if language in ("hinglish", "code-switched") or any(w in text for w in ["theek", "hai", "yaar", "kya", "batao", "hoon", "nahi", "kaise"]):
+        reply_text = (
+            "I understand yaar. Sab theek ho jayega, tension mat lo. "
             "Take a deep breath — main yahan hoon sunne ke liye. "
             "Tell me more about what's on your mind."
-        ),
+        )
+    else:
+        reply_text = (
+            "I hear you and I am here for you. "
+            "Take a deep breath — share whatever is on your mind."
+        )
+
+    return AIResponse(
+        reply=reply_text,
         severity="none",
         category="none",
-        rationale="[MOCK] No risk signals detected. Normal conversational response.",
+        rationale="No risk signals detected. Normal conversational response with Hinglish mirroring.",
     )
 
 
