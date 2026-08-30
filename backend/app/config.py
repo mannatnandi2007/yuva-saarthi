@@ -12,8 +12,10 @@ class Settings(BaseSettings):
     supabase_url: str = "https://placeholder.supabase.co"
     supabase_key: str = "placeholder-key"
     
-    # LLM Settings
+    # LLM Settings (Primary: Gemini, Auto-fallback: Groq Cloud)
     llm_api_key: Optional[str] = None
+    gemini_api_key: Optional[str] = None
+    groq_api_key: Optional[str] = None
     
     # Telephony Integrations
     bland_ai_key: Optional[str] = None

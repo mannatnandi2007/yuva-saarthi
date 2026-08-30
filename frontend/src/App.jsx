@@ -1,12 +1,12 @@
-// YUVAA Saarthi Frontend Coordinator
-// Reference: PRD §3 (Features walkthrough) & Execution Plan
+// YUVAA Saarthi Main Application Container
+// Clean ChatGPT-style layout with seamless auth transitions
 
 import React, { useState } from 'react';
 import Signup from './pages/Signup.jsx';
 import Consent from './pages/Consent.jsx';
 import OtpVerification from './pages/OtpVerification.jsx';
 import Chat from './pages/Chat.jsx';
-import { Heart } from 'lucide-react';
+import { Heart, PhoneCall } from 'lucide-react';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('signup');
@@ -21,7 +21,6 @@ export default function App() {
       ...prev,
       ...consentTimestamps
     }));
-    // After consent and API call succeeds, go to OTP
     setCurrentPage('otp');
   };
 
@@ -35,92 +34,63 @@ export default function App() {
     setCurrentPage('chat');
   };
 
-  const handleNavigation = (page) => {
-    setCurrentPage(page);
+  const handleLogout = () => {
+    setUserSession(null);
+    setCurrentPage('signup');
   };
 
+  // If in chat workspace, render full-screen ChatGPT view
+  if (currentPage === 'chat') {
+    return (
+      <Chat 
+        userSession={userSession} 
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Onboarding / Auth flow
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)' }}>
       
-      {/* Top Navigation Header */}
+      {/* Clean minimal navbar for onboarding */}
       <nav style={{ 
         background: 'var(--bg-secondary)', 
         borderBottom: '1px solid var(--border-color)',
-        padding: '16px 24px',
+        padding: '16px 32px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }} onClick={() => handleNavigation('signup')}>
-          <Heart size={22} color="var(--accent-purple)" fill="var(--accent-purple)" />
-          <span style={{ fontSize: '1.25rem', fontFamily: 'var(--font-display)', fontWeight: '800' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ 
+            width: '32px', 
+            height: '32px', 
+            borderRadius: '8px', 
+            background: 'linear-gradient(135deg, var(--accent-indigo), var(--accent-purple))',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <Heart size={18} color="#fff" fill="#fff" />
+          </div>
+          <span style={{ fontSize: '1.25rem', fontFamily: 'var(--font-display)', fontWeight: '800', letterSpacing: '-0.02em' }}>
             YUVAA <span className="gradient-text">Saarthi</span>
           </span>
         </div>
 
-        <div style={{ display: 'flex', gap: '16px', fontSize: '0.85rem' }}>
-          <button 
-            onClick={() => handleNavigation('signup')}
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              color: currentPage === 'signup' ? 'var(--text-primary)' : 'var(--text-muted)',
-              fontWeight: currentPage === 'signup' ? 'bold' : 'normal',
-              cursor: 'pointer'
-            }}
-          >
-            1. Onboarding
-          </button>
-          <span style={{ color: 'var(--text-muted)' }}>&rarr;</span>
-          <button 
-            onClick={() => handleNavigation('consent')}
-            disabled={!userSession}
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              color: currentPage === 'consent' ? 'var(--text-primary)' : 'var(--text-muted)',
-              fontWeight: currentPage === 'consent' ? 'bold' : 'normal',
-              cursor: userSession ? 'pointer' : 'not-allowed'
-            }}
-          >
-            2. Privacy & Consent
-          </button>
-          <span style={{ color: 'var(--text-muted)' }}>&rarr;</span>
-          <button 
-            onClick={() => handleNavigation('otp')}
-            disabled={!userSession?.policy_ack_at}
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              color: currentPage === 'otp' ? 'var(--text-primary)' : 'var(--text-muted)',
-              fontWeight: currentPage === 'otp' ? 'bold' : 'normal',
-              cursor: userSession?.policy_ack_at ? 'pointer' : 'not-allowed'
-            }}
-          >
-            3. Verification
-          </button>
-          <span style={{ color: 'var(--text-muted)' }}>&rarr;</span>
-          <button 
-            onClick={() => handleNavigation('chat')}
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              color: currentPage === 'chat' ? 'var(--text-primary)' : 'var(--text-muted)',
-              fontWeight: currentPage === 'chat' ? 'bold' : 'normal',
-              cursor: 'pointer'
-            }}
-          >
-            4. Chat Workspace
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+          <PhoneCall size={14} style={{ color: 'var(--accent-teal)' }} />
+          <span>24/7 National Helpline: <strong style={{ color: 'var(--text-primary)' }}>14416</strong></span>
         </div>
       </nav>
 
-      {/* Render Current Page Stub */}
-      <main style={{ flexGrow: 1 }}>
+      {/* Main Auth View */}
+      <main style={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
         {currentPage === 'signup' && (
           <Signup 
             onComplete={handleSignupComplete} 
-            onNavigate={handleNavigation} 
+            onNavigate={(page) => setCurrentPage(page)} 
           />
         )}
         
@@ -128,7 +98,7 @@ export default function App() {
           <Consent 
             userSession={userSession}
             onAccept={handleConsentAccept} 
-            onNavigate={handleNavigation} 
+            onNavigate={(page) => setCurrentPage(page)} 
           />
         )}
 
@@ -136,29 +106,10 @@ export default function App() {
           <OtpVerification 
             userSession={userSession}
             onVerify={handleOtpVerify}
-            onNavigate={handleNavigation}
-          />
-        )}
-        
-        {currentPage === 'chat' && (
-          <Chat 
-            userSession={userSession} 
-            onNavigate={handleNavigation} 
+            onNavigate={(page) => setCurrentPage(page)} 
           />
         )}
       </main>
-
-      {/* Footer Branding */}
-      <footer style={{ 
-        textAlign: 'center', 
-        padding: '16px', 
-        color: 'var(--text-muted)', 
-        fontSize: '0.75rem',
-        borderTop: '1px solid rgba(255, 255, 255, 0.02)',
-        background: 'rgba(0,0,0,0.1)'
-      }}>
-        YUVAA Saarthi &copy; 2026. Safety net well-being system. Stubs for Day 1 - Day 8 builds.
-      </footer>
 
     </div>
   );

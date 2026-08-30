@@ -436,3 +436,153 @@ class TestSignupValidation:
         }
         resp = client.post("/auth/signup", json=payload)
         assert resp.status_code == 200
+
+
+# ===========================================================================
+# 11. Phase 3: Risk Classification (POST /risk/check)
+# ===========================================================================
+
+class TestRiskClassification:
+    def test_risk_check_benign_message(self):
+        resp = client.post("/risk/check", json={
+            "user_id": TEST_USER_ID,
+            "message_content": "I am having lunch with my friend today"
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["severity"] == "none"
+        assert data["category"] == "none"
+        assert data["action_taken"] == "logged_only"
+
+    def test_risk_check_self_harm_triggers_call_action(self):
+        resp = client.post("/risk/check", json={
+            "user_id": TEST_USER_ID,
+            "message_content": "I want to end my life, please help"
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["severity"] == "high"
+        assert data["category"] == "self_harm"
+        assert data["action_taken"] == "call_placed"
+
+    def test_risk_check_abuse_triggers_rule_3_4a_bypass(self):
+        resp = client.post("/risk/check", json={
+            "user_id": TEST_USER_ID,
+            "message_content": "papa maarte hai roz bohot ganda"
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["severity"] == "high"
+        assert data["category"] == "abuse"
+        assert data["action_taken"] == "routed_to_helpline"
+
+
+# ===========================================================================
+# 12. Phase 3: Bland AI Voice Escalation (POST /escalation/trigger)
+# ===========================================================================
+
+class TestBlandAIEscalation:
+    def test_escalation_dispatches_bland_call_for_self_harm(self):
+        payload = {
+            "user_id": TEST_USER_ID,
+            "severity": "high",
+            "category": "self_harm",
+            "contact_phone": "+919876543211",
+            "contact_name": "Father",
+            "contact_relationship": "Parent"
+        }
+        resp = client.post("/escalation/trigger", json=payload)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "escalation_triggered"
+        assert data["action_taken"] == "call_placed"
+        assert data["call_dispatched"] is True
+        assert "call_details" in data
+        assert "call_id" in data["call_details"]
+
+    def test_escalation_aborts_call_for_abuse(self):
+        payload = {
+            "user_id": TEST_USER_ID,
+            "severity": "high",
+            "category": "abuse",
+            "contact_phone": "+919876543211",
+            "contact_name": "Parent"
+        }
+        resp = client.post("/escalation/trigger", json=payload)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "bypassed_safeguard"
+        assert data["action_taken"] == "routed_to_helpline"
+        assert data["call_dispatched"] is False
+        assert "Rule §3.4a" in data["details"]
+
+
+# ===========================================================================
+# 13. Phase 4: RAG Retrieval & Prompt Context (POST /rag/retrieve)
+# ===========================================================================
+
+class TestPhase4RAG:
+    def test_rag_retrieves_exam_guidelines(self):
+        resp = client.post("/rag/retrieve", json={
+            "query_text": "I am feeling so anxious about exams and study pressure",
+            "limit": 2
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["count"] >= 1
+        results = data["results"]
+        sources = [r["source"] for r in results]
+        assert any("NIMHANS" in s for s in sources)
+        assert any("Academic Pressure" in r["title"] for r in results)
+
+    def test_rag_retrieves_grounding_for_panic(self):
+        resp = client.post("/rag/retrieve", json={
+            "query_text": "mujhe bohot panic aur darr lag raha hai can't breathe",
+            "limit": 2
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        results = data["results"]
+        assert any("5-4-3-2-1" in r["guideline"] or "Physiological Sigh" in r["guideline"] for r in results)
+
+    def test_rag_retrieves_loneliness_guideline(self):
+        resp = client.post("/rag/retrieve", json={
+            "query_text": "I feel completely alone and isolated, koi nahi hai mere sath",
+            "limit": 2
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        results = data["results"]
+        assert any("ICMR" in r["source"] or "Isolation" in r["title"] for r in results)
+
+
+# ===========================================================================
+# 14. Phase 4: Rolling Summary Generator & Prompt Injection
+# ===========================================================================
+
+class TestPhase4RollingSummary:
+    def test_summary_generation_and_word_cap(self):
+        from app.services.summary_service import generate_rolling_summary
+        summary = generate_rolling_summary(
+            existing_summary=None,
+            user_message="I have been unable to sleep because of college entrance exam results coming out tomorrow.",
+            assistant_reply="It is completely understandable to feel tense. Take slow breaths, you are doing your best."
+        )
+        assert isinstance(summary, str)
+        assert len(summary) > 0
+        word_count = len(summary.split())
+        assert word_count <= 150
+
+    def test_summary_accumulation_across_turns(self):
+        from app.services.summary_service import generate_rolling_summary
+        s1 = generate_rolling_summary(None, "I had a fight with my best friend.", "I am sorry to hear that.")
+        s2 = generate_rolling_summary(s1, "Now they are ignoring my texts.", "Give them a bit of space.")
+        assert len(s2.split()) <= 150
+
+    def test_rag_prompt_context_builder(self):
+        from app.services.rag_service import build_rag_prompt_context
+        ctx = build_rag_prompt_context("exam stress padhai marks")
+        assert "EVIDENCE-BASED COUNSELING GUIDELINES" in ctx
+        assert "NIMHANS" in ctx
+
+

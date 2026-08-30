@@ -1,32 +1,37 @@
-// YUVAA Saarthi Chat Companion Interface
-// Reference: PRD §3.2 (Memory summary), §3.4a (Abuse helplines), & §3.6 (Hinglish mirroring)
-// Co-owned by Yashika (UI/Test sets) & Mannat (Final glue) (Execution Plan Day 2)
+// YUVAA Saarthi — ChatGPT-style Clean Companion Interface
+// Modern dark-mode layout with sidebar history, new chat, and seamless crisis routing
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Sparkles, BookOpen, AlertCircle, PhoneCall, RotateCcw, ShieldCheck, Wifi, WifiOff, Loader2 } from 'lucide-react';
+import { 
+  Send, Plus, MessageSquare, LogOut, Heart, PhoneCall, 
+  PanelLeftClose, PanelLeft, Sparkles, User, ShieldAlert, 
+  ExternalLink, Loader2 
+} from 'lucide-react';
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000';
 
-export default function Chat({ userSession, onNavigate }) {
-  const [messages, setMessages] = useState([
-    { sender: 'assistant', content: "Hello! Main aapka YUVAA Saarthi companion hoon. How are you feeling today? Share whatever is on your mind." }
-  ]);
+const SUGGESTED_PROMPTS = [
+  { label: "Exam Stress", text: "Exams ko lekar bohot zyada stress aur pressure feel ho raha hai." },
+  { label: "Feeling Overwhelmed", text: "I am feeling overwhelmed and don't know what to do." },
+  { label: "Family Tension", text: "Ghar pe bohot tension chal rahi hai, samajh nahi aa raha kaise handle karoon." },
+  { label: "Need to Vent", text: "I just feel really lonely today and need someone safe to talk to." }
+];
+
+export default function Chat({ userSession, onLogout }) {
+  const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [activeSessionId, setActiveSessionId] = useState(null);
+  const [sessionsList, setSessionsList] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [backendStatus, setBackendStatus] = useState('checking'); // 'connected' | 'offline' | 'checking'
-  
-  const [rollingSummary, setRollingSummary] = useState(
-    "User started session. Age group: " + (userSession?.age_band || "Youth") + ". No previous risk flags logged."
-  );
-  
-  // Real safety engine state from backend (PRD §3.4 & §3.4a)
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Active crisis state if triggered
   const [activeHelplines, setActiveHelplines] = useState([]);
-  const [currentRisk, setCurrentRisk] = useState(null);
-  const [actionTaken, setActionTaken] = useState('logged_only');
+  const [activeSafeguard, setActiveSafeguard] = useState(null);
 
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -36,464 +41,718 @@ export default function Chat({ userSession, onNavigate }) {
     scrollToBottom();
   }, [messages, isLoading]);
 
-  // Auth headers builder supporting real Supabase JWT and dev-bypass
   const getAuthHeaders = () => {
     const headers = {};
     const token = userSession?.access_token || userSession?.session_id;
-    if (token && token.length > 30) {
+    if (token && token.length > 20) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    // Dev bypass header for local development / testing
     const devUserId = userSession?.user_id || '00000000-0000-0000-0000-000000000001';
     headers['X-Dev-User-Id'] = devUserId;
     return headers;
   };
 
-  // Initialize or fetch existing session on component mount
+  // Load session history and initialize fresh new chat on startup
   useEffect(() => {
-    const initSession = async () => {
-      try {
-        const headers = getAuthHeaders();
-        // Check health
-        await axios.get(`${API_BASE_URL}/`, { timeout: 3000 });
-        setBackendStatus('connected');
+    const initChat = async () => {
+      const headers = getAuthHeaders();
 
-        // Create new session or fetch latest
-        const sessionRes = await axios.post(`${API_BASE_URL}/sessions`, {}, { headers });
-        if (sessionRes.data?.session_id) {
-          setActiveSessionId(sessionRes.data.session_id);
-          
-          // Try loading history if any
-          try {
-            const histRes = await axios.get(
-              `${API_BASE_URL}/chat/history/${sessionRes.data.session_id}`,
-              { headers }
-            );
-            if (histRes.data && histRes.data.length > 0) {
-              setMessages(histRes.data.map(m => ({
-                sender: m.sender,
-                content: m.content
-              })));
-            }
-          } catch (e) {
-            // New session has no history yet
-          }
+      // 1. Fetch prior session list for history sidebar
+      try {
+        const listRes = await axios.get(`${API_BASE_URL}/sessions`, { headers, timeout: 3000 });
+        if (Array.isArray(listRes.data)) {
+          setSessionsList(listRes.data);
         }
       } catch (err) {
-        console.warn("Backend API not reachable or session init error; running in local resilient mode:", err.message);
-        setBackendStatus('offline');
-        // Generate client-side fallback session ID
-        setActiveSessionId('local-' + Date.now());
+        console.debug("Could not fetch sessions list; starting local session.");
       }
+
+      // 2. Start a fresh new chat session on login
+      await createNewChat();
     };
 
-    initSession();
+    initChat();
   }, [userSession]);
 
-  const startNewSession = async () => {
+  const createNewChat = async () => {
     setIsLoading(true);
+    setActiveHelplines([]);
+    setActiveSafeguard(null);
+    setMessages([]); // Clean empty state with prompt suggestions like ChatGPT
+
     try {
       const headers = getAuthHeaders();
-      const sessionRes = await axios.post(`${API_BASE_URL}/sessions`, {}, { headers });
-      if (sessionRes.data?.session_id) {
-        setActiveSessionId(sessionRes.data.session_id);
+      const res = await axios.post(`${API_BASE_URL}/sessions`, {}, { headers, timeout: 3000 });
+      if (res.data?.session_id) {
+        const newId = res.data.session_id;
+        setActiveSessionId(newId);
+        setSessionsList(prev => [
+          { session_id: newId, started_at: new Date().toISOString(), title: "New Conversation" },
+          ...prev.filter(s => s.session_id !== newId)
+        ]);
       }
-      setBackendStatus('connected');
     } catch (err) {
-      setActiveSessionId('local-' + Date.now());
-    } finally {
-      setMessages([
-        { sender: 'assistant', content: "Hello! New session start ho gaya hai. Main aapka YUVAA Saarthi companion hoon. How are you feeling right now?" }
+      const fallbackId = 'local-' + Date.now();
+      setActiveSessionId(fallbackId);
+      setSessionsList(prev => [
+        { session_id: fallbackId, started_at: new Date().toISOString(), title: "New Conversation" },
+        ...prev
       ]);
-      setActiveHelplines([]);
-      setCurrentRisk(null);
-      setActionTaken('logged_only');
-      setRollingSummary("New session started. Waiting for user input.");
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  };
+
+  const loadSession = async (sessionId) => {
+    if (sessionId === activeSessionId) return;
+    setIsLoading(true);
+    setActiveSessionId(sessionId);
+    setActiveHelplines([]);
+    setActiveSafeguard(null);
+
+    try {
+      const headers = getAuthHeaders();
+      const res = await axios.get(`${API_BASE_URL}/chat/history/${sessionId}`, { headers, timeout: 4000 });
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        setMessages(res.data.map(m => ({ sender: m.sender, content: m.content })));
+      } else {
+        setMessages([]);
+      }
+    } catch (err) {
+      setMessages([]);
+    } finally {
       setIsLoading(false);
     }
   };
 
-  const sendMessage = async (textToSend) => {
-    const text = textToSend || inputText;
-    if (!text.trim() || isLoading) return;
+  const handleSendMessage = async (textOverride) => {
+    const text = (textOverride || inputText).trim();
+    if (!text || isLoading) return;
 
-    // Add user message to state immediately
-    const userMsg = { sender: 'user', content: text };
-    setMessages(prev => [...prev, userMsg]);
+    const userMessage = { sender: 'user', content: text };
+    setMessages(prev => [...prev, userMessage]);
     setInputText('');
     setIsLoading(true);
 
+    // Update session title in history if first message
+    if (messages.length === 0 && activeSessionId) {
+      setSessionsList(prev => prev.map(s => 
+        s.session_id === activeSessionId ? { ...s, title: text.slice(0, 28) + (text.length > 28 ? '...' : '') } : s
+      ));
+    }
+
     try {
       const headers = getAuthHeaders();
-      const currentSession = activeSessionId || 'local-' + Date.now();
+      const sessionId = activeSessionId || 'local-' + Date.now();
 
-      // Call real backend POST /chat endpoint
       const response = await axios.post(
         `${API_BASE_URL}/chat`,
-        {
-          session_id: currentSession,
-          message: text
-        },
-        { headers, timeout: 8000 }
+        { session_id: sessionId, message: text },
+        { headers, timeout: 10000 }
       );
 
-      setBackendStatus('connected');
       const data = response.data;
+      setMessages(prev => [...prev, { sender: 'assistant', content: data.reply }]);
+
       const risk = data.risk_classification;
       const action = data.action_taken;
 
-      // Add assistant response
-      setMessages(prev => [...prev, { sender: 'assistant', content: data.reply }]);
-
-      // Update safety and risk status
-      if (risk) {
-        setCurrentRisk({
-          severity: risk.severity.toUpperCase(),
-          category: risk.category,
-          rationale: risk.rationale
-        });
-      }
-      setActionTaken(action);
-
-      // Handle Helplines & Escalation routing
-      // RULE §3.4a: Abuse detected -> Surface helplines & BYPASS personal contacts
-      if (action === 'routed_to_helpline' || (risk?.category === 'abuse' && risk?.severity?.toLowerCase() === 'high')) {
+      // Handle crisis safety routing
+      if (action === 'routed_to_helpline' || (risk?.category === 'abuse' && risk?.severity === 'high')) {
+        setActiveSafeguard("abuse_bypass");
         setActiveHelplines([
-          { name: "Childline India", phone: "1098", details: "Confidential 24/7 helpline for minors & youth needing protection/support." },
-          { name: "KIRAN Mental Health", phone: "1800-599-0019", details: "National mental health helpline, 24/7 toll-free support." }
+          { name: "Childline India", number: "1098", desc: "Confidential 24/7 child & youth safety line" },
+          { name: "KIRAN Helpline", number: "1800-599-0019", desc: "National mental health 24/7 toll-free" }
         ]);
-        setRollingSummary("⚠️ High-severity ABUSE flagged. Emergency personal contact escalation bypassed (PRD §3.4a). Direct helpline resources surfaced.");
-      }
-      // RULE §3.4: Self-harm detected -> Surface crisis helplines
-      else if (risk?.severity?.toLowerCase() === 'high' && risk?.category === 'self_harm') {
+      } else if (risk?.severity === 'high' && risk?.category === 'self_harm') {
+        setActiveSafeguard("self_harm_alert");
         setActiveHelplines([
-          { name: "KIRAN Helpline", phone: "1800-599-0019", details: "Free, confidential 24/7 crisis response line." },
-          { name: "Tele-MANAS", phone: "14416", details: "Govt of India 24/7 tele-mental health assistance." }
+          { name: "KIRAN Helpline", number: "1800-599-0019", desc: "Immediate 24/7 crisis support" },
+          { name: "Tele-MANAS", number: "14416", desc: "Govt of India tele-mental health service" }
         ]);
-        setRollingSummary("⚠️ High-severity SELF_HARM flagged. Safety escalation initiated. Surfaced urgent crisis helplines.");
-      }
-      // General distress or normal conversation
-      else if (risk?.severity?.toLowerCase() === 'medium') {
-        setRollingSummary(`User expressing moderate distress (${risk.category}). Empathy and active listening provided.`);
-      } else {
-        setRollingSummary("Normal conversational flow. Tone: stable, no risk triggers detected.");
       }
 
     } catch (err) {
-      console.error("Chat API error; falling back to client-side triage:", err);
-      setBackendStatus('offline');
-
-      // Client-side graceful fallback simulation if backend is temporarily disconnected
+      // Local graceful fallback
       const textLower = text.toLowerCase();
-      if (textLower.includes('marte') || textLower.includes('beat') || textLower.includes('abuse') || textLower.includes('galat chhua')) {
-        setCurrentRisk({ severity: 'HIGH', category: 'abuse', rationale: "Abuse indicators detected in Roman Hindi/English." });
-        setActionTaken('routed_to_helpline');
+      if (textLower.includes('marte') || textLower.includes('beat') || textLower.includes('abuse')) {
+        setActiveSafeguard("abuse_bypass");
         setActiveHelplines([
-          { name: "Childline India", phone: "1098", details: "For children and minors requiring immediate protection / counseling." },
-          { name: "KIRAN Helpline", phone: "1800-599-0019", details: "National mental health helpline, 24/7 toll-free support." }
+          { name: "Childline India", number: "1098", desc: "24/7 youth safety & protection" },
+          { name: "KIRAN Helpline", number: "1800-599-0019", desc: "Confidential mental health support" }
         ]);
         setMessages(prev => [...prev, {
           sender: 'assistant',
           content: "Tumhari safety humare liye sabse important hai. Aapki privacy protected hai aur personal contacts ko contact nahi kiya jayega. Please Childline 1098 ya KIRAN 1800-599-0019 se help lo."
         }]);
-        setRollingSummary("⚠️ High severity ABUSE flagged. Emergency personal contact escalation bypassed (PRD §3.4a). Direct helpline resources surfaced.");
-      } else if (textLower.includes('suicide') || textLower.includes('marna') || textLower.includes('kill myself') || textLower.includes('jaan de')) {
-        setCurrentRisk({ severity: 'HIGH', category: 'self_harm', rationale: "Self-harm indicators detected." });
-        setActionTaken('call_placed');
+      } else if (textLower.includes('suicide') || textLower.includes('marna') || textLower.includes('kill myself')) {
+        setActiveSafeguard("self_harm_alert");
         setActiveHelplines([
-          { name: "KIRAN Support", phone: "1800-599-0019", details: "Toll-free 24/7 counselor connection." }
+          { name: "KIRAN Helpline", number: "1800-599-0019", desc: "Free, confidential 24/7 crisis line" }
         ]);
         setMessages(prev => [...prev, {
           sender: 'assistant',
           content: "Main tumhari baat sun raha hoon. Please kisi trusted adult ya KIRAN Helpline (1800-599-0019) se baat karo. You are not alone."
         }]);
-        setRollingSummary("⚠️ High severity SELF_HARM flagged. Safety escalation initiated.");
       } else {
         setMessages(prev => [...prev, {
           sender: 'assistant',
-          content: "I understand yaar. Sab theek ho jayega, tension mat lo. Take a deep breath — main yahan hoon sunne ke liye. Batao kya chal raha hai?"
+          content: "I hear you. Main yahan hoon aapke saath. Jo bhi dil me hai, khul ke share karo — I am here to listen."
         }]);
-        setRollingSummary("Conversational register matched (Hinglish mirroring).");
       }
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const displayPhone = userSession?.user_phone || userSession?.phone || "+91 ••••• •••••";
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '20px', padding: '20px', height: 'calc(100vh - 120px)' }}>
+    <div style={{ display: 'flex', height: '100vh', width: '100vw', background: '#09090b', color: '#f4f4f5', overflow: 'hidden' }}>
       
-      {/* Sidebar: Session Summary Context Display */}
-      <div className="glass-container" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '18px', overflowY: 'auto' }}>
+      {/* ========================================================================= */}
+      {/* 1. LEFT SIDEBAR (ChatGPT Style)                                           */}
+      {/* ========================================================================= */}
+      <aside style={{
+        width: sidebarOpen ? '260px' : '0px',
+        minWidth: sidebarOpen ? '260px' : '0px',
+        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        background: '#121215',
+        borderRight: '1px solid rgba(255, 255, 255, 0.08)',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        overflow: 'hidden',
+        position: 'relative'
+      }}>
         
-        {/* Backend Status indicator */}
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between',
-          padding: '8px 12px',
-          borderRadius: '8px',
-          background: backendStatus === 'connected' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)',
-          border: `1px solid ${backendStatus === 'connected' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
-          fontSize: '0.8rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {backendStatus === 'connected' ? (
-              <Wifi size={14} color="var(--success)" />
-            ) : (
-              <WifiOff size={14} color="var(--danger)" />
-            )}
-            <span style={{ fontWeight: '600' }}>
-              {backendStatus === 'connected' ? 'FastAPI Backend Online' : 'FastAPI Backend Offline'}
-            </span>
-          </div>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-            {activeSessionId ? activeSessionId.slice(0, 8) + '...' : 'No session'}
-          </span>
-        </div>
-
-        {/* Rolling summary panel (PRD §3.2) */}
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <BookOpen size={16} color="var(--accent-indigo)" />
-            <h3 style={{ fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rolling Summary</h3>
-          </div>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5', background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px' }}>
-            {rollingSummary}
-          </p>
-        </div>
-
-        {/* Real-time Risk classification details */}
-        {currentRisk && (
-          <div style={{ 
-            background: currentRisk.severity === 'HIGH' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(245, 158, 11, 0.08)', 
-            border: `1px solid ${currentRisk.severity === 'HIGH' ? 'var(--danger)' : '#f59e0b'}`, 
-            borderRadius: '8px', 
-            padding: '12px',
-            fontSize: '0.8rem'
-          }} className="animate-slideup">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: currentRisk.severity === 'HIGH' ? 'var(--danger)' : '#f59e0b', fontWeight: 'bold', marginBottom: '6px' }}>
-              <AlertCircle size={14} /> Risk Classification
+        {/* Top Header & New Chat Button */}
+        <div style={{ padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Heart size={16} color="#fff" fill="#fff" />
+              </div>
+              <span style={{ fontWeight: '700', fontSize: '1rem', letterSpacing: '-0.02em' }}>
+                YUVAA <span style={{ color: '#a855f7' }}>Saarthi</span>
+              </span>
             </div>
-            <p><strong>Severity:</strong> <span style={{ color: currentRisk.severity === 'HIGH' ? 'var(--danger)' : '#f59e0b' }}>{currentRisk.severity}</span></p>
-            <p><strong>Category:</strong> {currentRisk.category}</p>
-            <p><strong>Action Taken:</strong> <code>{actionTaken}</code></p>
-            <p style={{ color: 'var(--text-secondary)', marginTop: '4px' }}><strong>Rationale:</strong> {currentRisk.rationale}</p>
-          </div>
-        )}
 
-        {/* Abuse-Aware Routing Safeguard Note (PRD §3.4a) */}
-        {actionTaken === 'routed_to_helpline' && (
-          <div style={{
-            background: 'rgba(20, 184, 166, 0.08)',
-            border: '1px solid var(--accent-teal)',
-            borderRadius: '8px',
-            padding: '12px',
-            fontSize: '0.78rem'
-          }} className="animate-slideup">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-teal)', fontWeight: 'bold', marginBottom: '4px' }}>
-              <ShieldCheck size={14} /> Safeguard §3.4a Active
-            </div>
-            <p style={{ color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-              Personal emergency contacts are <strong>NOT dialed</strong> or notified. Abuse cases are routed exclusively to professional helplines for user safety.
-            </p>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}
+              title="Close sidebar"
+            >
+              <PanelLeftClose size={18} />
+            </button>
           </div>
-        )}
 
-        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <button 
-            onClick={startNewSession}
-            disabled={isLoading}
-            style={{ 
-              width: '100%', 
-              background: 'rgba(255,255,255,0.05)', 
-              color: 'var(--text-secondary)', 
-              border: '1px solid rgba(255,255,255,0.08)',
-              padding: '10px', 
-              borderRadius: '8px',
+          {/* New Chat Button */}
+          <button
+            onClick={createNewChat}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+              padding: '10px 14px',
+              borderRadius: '10px',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              background: 'rgba(255, 255, 255, 0.04)',
+              color: '#f4f4f5',
               cursor: 'pointer',
+              fontSize: '0.88rem',
+              fontWeight: '500',
+              transition: 'background 0.2s ease'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Plus size={16} />
+              <span>New chat</span>
+            </div>
+            <Sparkles size={14} style={{ color: '#a855f7' }} />
+          </button>
+
+        </div>
+
+        {/* Middle: Chat History Sessions */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 10px' }}>
+          <div style={{ fontSize: '0.72rem', color: '#71717a', fontWeight: '600', padding: '8px 10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Recent Conversations
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            {sessionsList.length === 0 ? (
+              <div style={{ padding: '12px 10px', fontSize: '0.82rem', color: '#52525b' }}>
+                No prior chats yet
+              </div>
+            ) : (
+              sessionsList.map((session) => {
+                const isActive = session.session_id === activeSessionId;
+                const title = session.title || "Chat Session";
+                return (
+                  <button
+                    key={session.session_id}
+                    onClick={() => loadSession(session.session_id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: isActive ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                      color: isActive ? '#f4f4f5' : '#a1a1aa',
+                      fontSize: '0.84rem',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      width: '100%',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) e.currentTarget.style.background = 'transparent';
+                    }}
+                  >
+                    <MessageSquare size={15} style={{ flexShrink: 0, color: isActive ? '#a855f7' : '#71717a' }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {title}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Bottom: User Profile & Logout */}
+        <div style={{
+          padding: '14px',
+          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+          background: 'rgba(0, 0, 0, 0.2)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
+        }}>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              background: '#27272a',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
-              fontSize: '0.85rem'
-            }}
-          >
-            <RotateCcw size={14} /> Start New Session
-          </button>
-
-          <button 
-            onClick={() => onNavigate('signup')}
-            style={{ 
-              width: '100%', 
-              background: 'none', 
-              color: 'var(--text-muted)', 
-              border: 'none',
-              padding: '6px', 
-              cursor: 'pointer',
-              textDecoration: 'underline',
-              fontSize: '0.8rem'
-            }}
-          >
-            Edit Onboarding & Contacts
-          </button>
-        </div>
-      </div>
-
-      {/* Main Chat Interface */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
-        
-        {/* Chat Window */}
-        <div className="glass-container" style={{ flexGrow: 1, padding: '20px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          
-          <header style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Sparkles size={18} color="var(--accent-purple)" />
-            <h2 style={{ fontSize: '1.15rem' }}>YUVAA Companion (Hinglish Active)</h2>
-            <div style={{ 
-              background: backendStatus === 'connected' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', 
-              color: backendStatus === 'connected' ? 'var(--success)' : 'var(--danger)', 
-              padding: '2px 8px', 
-              borderRadius: '12px', 
-              fontSize: '0.75rem', 
-              marginLeft: 'auto' 
+              color: '#d4d4d8'
             }}>
-              {backendStatus === 'connected' ? 'FastAPI Active' : 'Fallback Mode'}
+              <User size={16} />
             </div>
-          </header>
-
-          {/* Messages Stream */}
-          <div style={{ flexGrow: 1, overflowY: 'auto', padding: '16px 0', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {messages.map((msg, index) => (
-              <div 
-                key={index} 
-                style={{ 
-                  alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start',
-                  maxWidth: '78%',
-                  background: msg.sender === 'user' ? 'linear-gradient(135deg, var(--accent-indigo), var(--accent-purple))' : 'var(--bg-tertiary)',
-                  borderRadius: msg.sender === 'user' ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
-                  padding: '12px 16px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                  fontSize: '0.95rem',
-                  lineHeight: '1.45'
-                }}
-              >
-                {msg.content}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '0.82rem', fontWeight: '600', color: '#f4f4f5', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {displayPhone}
               </div>
-            ))}
+              <div style={{ fontSize: '0.72rem', color: '#71717a' }}>
+                Verified Account
+              </div>
+            </div>
+          </div>
 
-            {isLoading && (
-              <div style={{ 
-                alignSelf: 'flex-start', 
-                background: 'var(--bg-tertiary)', 
-                padding: '10px 14px', 
-                borderRadius: '16px 16px 16px 2px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                color: 'var(--text-muted)',
-                fontSize: '0.85rem'
+          <button
+            onClick={onLogout}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 10px',
+              borderRadius: '6px',
+              border: 'none',
+              background: 'none',
+              color: '#ef4444',
+              cursor: 'pointer',
+              fontSize: '0.82rem',
+              marginTop: '4px',
+              transition: 'background 0.2s ease'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+          >
+            <LogOut size={14} />
+            <span>Log out</span>
+          </button>
+
+        </div>
+
+      </aside>
+
+      {/* ========================================================================= */}
+      {/* 2. MAIN CHAT AREA (ChatGPT Style)                                         */}
+      {/* ========================================================================= */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+        
+        {/* Top Minimal Bar */}
+        <header style={{
+          height: '52px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 20px',
+          background: 'rgba(9, 9, 11, 0.7)',
+          backdropFilter: 'blur(10px)',
+          zIndex: 10
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {!sidebarOpen && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+                title="Open sidebar"
+              >
+                <PanelLeft size={20} />
+              </button>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontWeight: '600', fontSize: '0.95rem' }}>YUVAA Saarthi</span>
+              <span style={{
+                background: 'rgba(168, 85, 247, 0.12)',
+                color: '#c084fc',
+                fontSize: '0.72rem',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                border: '1px solid rgba(168, 85, 247, 0.25)'
               }}>
-                <Loader2 size={16} className="animate-spin" /> YUVAA Saarthi is listening...
+                Hinglish Companion
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#71717a' }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e' }}></span>
+            <span>Private & Confidential</span>
+          </div>
+        </header>
+
+        {/* Chat Conversation Scroll Area */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: '24px 16px'
+        }}>
+          
+          <div style={{ width: '100%', maxWidth: '768px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            
+            {/* Empty State: ChatGPT Greeting & Suggestion Pills */}
+            {messages.length === 0 ? (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                paddingTop: '60px',
+                gap: '24px'
+              }} className="animate-slideup">
+                
+                <div style={{
+                  width: '56px',
+                  height: '56px',
+                  borderRadius: '16px',
+                  background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 8px 24px rgba(168, 85, 247, 0.25)'
+                }}>
+                  <Heart size={28} color="#fff" fill="#fff" />
+                </div>
+
+                <div>
+                  <h1 style={{ fontSize: '1.75rem', fontWeight: '700', letterSpacing: '-0.02em', marginBottom: '8px' }}>
+                    How can I support you today?
+                  </h1>
+                  <p style={{ color: '#a1a1aa', fontSize: '0.95rem', maxWidth: '520px', margin: '0 auto', lineHeight: '1.5' }}>
+                    Main aapka confidential companion hoon. English ya Hinglish me apni feelings, stress, ya thoughts bina kisi jhijhak share karein.
+                  </p>
+                </div>
+
+                {/* 4 Suggestion Pills */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                  gap: '12px',
+                  width: '100%',
+                  marginTop: '16px'
+                }}>
+                  {SUGGESTED_PROMPTS.map((prompt, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleSendMessage(prompt.text)}
+                      style={{
+                        padding: '16px',
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: '12px',
+                        color: '#d4d4d8',
+                        fontSize: '0.86rem',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                        e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.3)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                      }}
+                    >
+                      <span style={{ fontWeight: '600', color: '#f4f4f5' }}>{prompt.label}</span>
+                      <span style={{ color: '#71717a', fontSize: '0.8rem', lineHeight: '1.4' }}>{prompt.text}</span>
+                    </button>
+                  ))}
+                </div>
+
+              </div>
+            ) : (
+              /* Message Stream */
+              messages.map((msg, index) => {
+                const isUser = msg.sender === 'user';
+                return (
+                  <div 
+                    key={index} 
+                    style={{ 
+                      display: 'flex', 
+                      gap: '14px', 
+                      alignItems: 'flex-start',
+                      justifyContent: isUser ? 'flex-end' : 'flex-start'
+                    }}
+                    className="animate-slideup"
+                  >
+                    {!isUser && (
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        marginTop: '2px'
+                      }}>
+                        <Sparkles size={16} color="#fff" />
+                      </div>
+                    )}
+
+                    <div style={{
+                      maxWidth: '82%',
+                      padding: isUser ? '12px 18px' : '8px 4px',
+                      borderRadius: isUser ? '20px' : '0',
+                      background: isUser ? '#27272a' : 'transparent',
+                      color: isUser ? '#f4f4f5' : '#e4e4e7',
+                      fontSize: '0.96rem',
+                      lineHeight: '1.6',
+                      whiteSpace: 'pre-wrap'
+                    }}>
+                      {msg.content}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+
+            {/* Typing indicator */}
+            {isLoading && (
+              <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <Loader2 size={16} color="#fff" className="animate-spin" />
+                </div>
+                <span style={{ color: '#71717a', fontSize: '0.88rem' }}>Thinking...</span>
               </div>
             )}
+
+            {/* Crisis Support Card (Cleanly surfaced without flashy slop) */}
+            {activeHelplines.length > 0 && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.06)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                borderRadius: '14px',
+                padding: '18px 20px',
+                marginTop: '12px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px'
+              }} className="animate-slideup">
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#f87171' }}>
+                  <ShieldAlert size={20} />
+                  <span style={{ fontWeight: '700', fontSize: '0.95rem' }}>
+                    {activeSafeguard === 'abuse_bypass' 
+                      ? 'Confidential Helpline Support Available' 
+                      : 'Immediate Crisis Support Lines'}
+                  </span>
+                </div>
+
+                <p style={{ fontSize: '0.86rem', color: '#d4d4d8', lineHeight: '1.5', margin: 0 }}>
+                  {activeSafeguard === 'abuse_bypass' 
+                    ? 'Your safety and privacy come first. Your emergency contacts are NOT contacted. You can reach out to dedicated youth protection helplines 24/7:' 
+                    : 'You do not have to go through this alone. Professional counselors are available 24/7 to listen and support you:'}
+                </p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                  {activeHelplines.map((helpline, i) => (
+                    <a
+                      key={i}
+                      href={`tel:${helpline.number.replace(/\D/g, '')}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 16px',
+                        background: 'rgba(0, 0, 0, 0.3)',
+                        border: '1px solid rgba(239, 68, 68, 0.2)',
+                        borderRadius: '10px',
+                        color: '#f4f4f5',
+                        textDecoration: 'none',
+                        transition: 'background 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.12)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.3)'}
+                    >
+                      <div>
+                        <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#fca5a5' }}>
+                          {helpline.name} ({helpline.number})
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginTop: '2px' }}>
+                          {helpline.desc}
+                        </div>
+                      </div>
+                      <PhoneCall size={16} style={{ color: '#f87171', flexShrink: 0 }} />
+                    </a>
+                  ))}
+                </div>
+
+              </div>
+            )}
+
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Interactive Suggestions (Hinglish examples matching PRD §3.6) */}
-          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            <button 
-              onClick={() => sendMessage("I'm fine yaar bas thoda low feel ho raha hai")}
-              disabled={isLoading}
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-secondary)', padding: '6px 10px', borderRadius: '14px', fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
-            >
-              "bas thoda low feel ho raha hai"
-            </button>
-            <button 
-              onClick={() => sendMessage("mumma bahut marte hai roz bhaiya ke samne")}
-              disabled={isLoading}
-              style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', color: 'var(--danger)', padding: '6px 10px', borderRadius: '14px', fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
-            >
-              ⚠️ "mumma bahut marte hai" (Abuse Bypass Test)
-            </button>
-            <button 
-              onClick={() => sendMessage("tension ho rha hai exams ka, what should I do?")}
-              disabled={isLoading}
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-secondary)', padding: '6px 10px', borderRadius: '14px', fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
-            >
-              "tension ho rha hai exams ka"
-            </button>
-            <button 
-              onClick={() => sendMessage("i want to suicide, sab khatam ho gaya")}
-              disabled={isLoading}
-              style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', color: 'var(--danger)', padding: '6px 10px', borderRadius: '14px', fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
-            >
-              ⚠️ "suicide, sab khatam" (Self-Harm Test)
-            </button>
-          </div>
+        </div>
 
-          {/* Form input */}
-          <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
-            <input 
-              type="text" 
-              placeholder="Type in English, Hindi, or Hinglish (e.g. 'bohot stress ho raha hai')..."
+        {/* Bottom Floating Input Bar (ChatGPT Style) */}
+        <div style={{
+          padding: '16px 20px 24px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          background: 'linear-gradient(to top, #09090b 80%, transparent)'
+        }}>
+          
+          <div style={{
+            width: '100%',
+            maxWidth: '768px',
+            position: 'relative',
+            background: '#18181b',
+            border: '1px solid rgba(255, 255, 255, 0.14)',
+            borderRadius: '24px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            padding: '6px 10px 6px 18px',
+            transition: 'border-color 0.2s ease'
+          }}>
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder="Message YUVAA Saarthi... (English ya Hinglish me baat karein)"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+              onKeyDown={handleKeyDown}
               disabled={isLoading}
-              className="form-input"
-              style={{ flexGrow: 1 }}
+              style={{
+                flex: 1,
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                color: '#f4f4f5',
+                fontSize: '0.95rem',
+                padding: '8px 0',
+                fontFamily: 'inherit'
+              }}
             />
-            <button 
-              onClick={() => sendMessage()}
-              disabled={isLoading || !inputText.trim()}
-              className="gradient-btn"
-              style={{ width: '45px', height: '45px', borderRadius: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', opacity: (!inputText.trim() || isLoading) ? 0.6 : 1 }}
+
+            <button
+              onClick={() => handleSendMessage()}
+              disabled={!inputText.trim() || isLoading}
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                border: 'none',
+                background: inputText.trim() && !isLoading ? '#f4f4f5' : '#27272a',
+                color: inputText.trim() && !isLoading ? '#09090b' : '#71717a',
+                cursor: inputText.trim() && !isLoading ? 'pointer' : 'default',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                transition: 'all 0.15s ease'
+              }}
             >
               <Send size={16} />
             </button>
           </div>
 
+          <p style={{ fontSize: '0.72rem', color: '#52525b', marginTop: '10px', textAlign: 'center' }}>
+            YUVAA Saarthi is an empathetic youth companion. If you are in immediate danger or distress, call <strong>14416</strong> or <strong>1098</strong>.
+          </p>
+
         </div>
 
-        {/* Dynamic Helpline surface on Abuse trigger (PRD §3.4a) or Crisis trigger */}
-        {activeHelplines.length > 0 && (
-          <div className="glass-container animate-slideup" style={{ padding: '16px', borderLeft: '5px solid var(--danger)', background: 'rgba(239,68,68,0.03)' }}>
-            <h3 style={{ fontSize: '0.95rem', color: 'var(--danger)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <PhoneCall size={16} /> Verified Safety Helplines (Routed under Safeguard §3.4a)
-            </h3>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              {activeHelplines.map((helpline, i) => (
-                <div key={i} style={{ background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <strong style={{ fontSize: '0.9rem' }}>{helpline.name}</strong>
-                    <span style={{ color: 'var(--accent-teal)', fontSize: '0.9rem', fontWeight: 'bold' }}>{helpline.phone}</span>
-                  </div>
-                  <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>{helpline.details}</p>
-                  
-                  {/* One-tap dial button (PRD §3.4a) */}
-                  <a 
-                    href={`tel:${helpline.phone}`}
-                    style={{ 
-                      display: 'inline-block', 
-                      background: 'rgba(20, 184, 166, 0.15)', 
-                      color: 'var(--accent-teal)', 
-                      padding: '4px 10px', 
-                      borderRadius: '4px', 
-                      fontSize: '0.75rem', 
-                      textDecoration: 'none', 
-                      fontWeight: 'bold' 
-                    }}
-                  >
-                    Tap to Dial: {helpline.phone}
-                  </a>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+      </main>
 
-      </div>
     </div>
   );
 }
