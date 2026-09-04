@@ -4,6 +4,8 @@
 # BUG-001 FIX: High-severity non-abuse messages now trigger Bland AI escalation.
 # BUG-005 FIX: save_message() return value is captured; message_id passed to risk logging.
 # BUG-009 FIX: started_at coercion handled via explicit string→datetime parsing.
+# FEATURE: Cross-Login Context — new sessions are seeded with the previous session's
+#           summary_snapshot so the AI remembers past interactions (PRD §3.2).
 
 import os
 import uuid
@@ -39,11 +41,62 @@ class ChatServiceResult:
 # Session helpers
 # ---------------------------------------------------------------------------
 
+def get_latest_session_summary(user_id: str) -> Optional[str]:
+    """
+    Cross-Login Context API (PRD §3.2).
+
+    Retrieve the summary_snapshot from the most recent PREVIOUS session that
+    belongs to this user.  This is called BEFORE inserting the new session so
+    the query can never accidentally return the session we are about to create.
+
+    Returns:
+        str  — the prior summary text when it is non-empty, otherwise None.
+        None — if no previous session exists, the prior summary is NULL/empty,
+               or the Supabase lookup fails (graceful degradation).
+
+    Security: the query is always filtered by user_id so user A can never
+    receive user B's conversation context.
+    """
+    try:
+        result = (
+            supabase.table("sessions")
+            .select("summary_snapshot")
+            .eq("user_id", user_id)
+            .order("started_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        rows = result.data or []
+        if rows:
+            snapshot = rows[0].get("summary_snapshot")
+            # Treat NULL and whitespace-only strings as "no prior context"
+            if snapshot and snapshot.strip():
+                return snapshot
+    except Exception as e:
+        # Non-fatal: a missing prior summary is never a reason to block
+        # session creation.  Log at WARNING level and fall through.
+        logger.warning(
+            "get_latest_session_summary: lookup failed for user %s — "
+            "new session will start without prior context. Error: %s",
+            user_id, e,
+        )
+    return None
+
+
 def create_session(user_id: str) -> dict:
     """
     Insert a new row into the sessions table and return it.
     Called by POST /sessions.
+
+    Cross-Login Context: before inserting, the most recent previous session's
+    summary_snapshot is fetched and used to seed the new session so the AI
+    remembers past interactions from the very first message (PRD §3.2).
     """
+    # --- Cross-Login Context: fetch prior summary BEFORE inserting ---
+    # Querying before the insert guarantees we never accidentally pick up the
+    # row we are about to create (no race condition, no off-by-one).
+    prior_summary = get_latest_session_summary(user_id)
+
     try:
         result = (
             supabase.table("sessions")
@@ -59,6 +112,21 @@ def create_session(user_id: str) -> dict:
         # BUG-009 FIX: ensure started_at is always a datetime-compatible string
         if isinstance(row.get("started_at"), str):
             pass  # Pydantic v2 will coerce ISO string to datetime
+
+        # --- Cross-Login Context: seed the new session with the prior summary ---
+        # save_session_summary() writes to both Supabase and the in-memory cache
+        # so that the very first call to get_ai_response() in this session already
+        # has rolling_summary populated with the user's historical context.
+        if prior_summary:
+            new_session_id = str(row["id"])
+            from app.services.summary_service import save_session_summary  # local import avoids circular dep
+            save_session_summary(new_session_id, prior_summary)
+            row["summary_snapshot"] = prior_summary
+            logger.info(
+                "[CROSS-LOGIN CONTEXT] Seeded session %s for user %s with prior summary (%d words).",
+                new_session_id, user_id, len(prior_summary.split()),
+            )
+
         return row
     except HTTPException:
         raise
@@ -70,7 +138,8 @@ def create_session(user_id: str) -> dict:
                 "id": str(uuid.uuid4()),
                 "user_id": user_id,
                 "started_at": datetime.now(timezone.utc).isoformat(),
-                "summary_snapshot": None,
+                # Preserve any prior summary even in offline/dev-mode fallback
+                "summary_snapshot": prior_summary,
             }
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

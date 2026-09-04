@@ -174,6 +174,10 @@ class TestGetContacts:
 class TestCreateSession:
     @patch("app.services.chat_service.supabase")
     def test_creates_session_and_returns_id(self, mock_supabase):
+        # get_latest_session_summary: no prior session (first-time user)
+        mock_supabase.table.return_value.select.return_value \
+            .eq.return_value.order.return_value.limit.return_value.execute.return_value = fake_result([])
+        # create_session insert
         mock_supabase.table.return_value.insert.return_value.execute.return_value = fake_result([
             {"id": TEST_SESSION_ID, "user_id": TEST_USER_ID, "started_at": NOW_ISO}
         ])
@@ -184,6 +188,221 @@ class TestCreateSession:
         assert body["session_id"] == TEST_SESSION_ID
         assert body["user_id"] == TEST_USER_ID
 
+
+# ===========================================================================
+# 5b. Cross-Login Context — POST /sessions summary seeding
+# ===========================================================================
+
+class TestCrossLoginContext:
+    """
+    Tests for the Cross-Login Context API (PRD §3.2).
+
+    Verifies that when a returning user creates a new session, the most recent
+    previous session's summary_snapshot is fetched and seeded into the new
+    session so the AI remembers past interactions from the very first message.
+    """
+
+    PRIOR_SUMMARY = "User has been experiencing exam anxiety and sleep issues for two weeks. Mentioned strained relationship with parents over academic pressure."
+
+    def _make_select_mock(self, mock_supabase, rows):
+        """Wire the select chain used by get_latest_session_summary."""
+        mock_supabase.table.return_value.select.return_value \
+            .eq.return_value.order.return_value.limit.return_value.execute.return_value = fake_result(rows)
+
+    def _make_insert_mock(self, mock_supabase, session_id=None, user_id=None):
+        """Wire the insert chain used by create_session."""
+        sid = session_id or TEST_SESSION_ID
+        uid = user_id or TEST_USER_ID
+        mock_supabase.table.return_value.insert.return_value.execute.return_value = fake_result([
+            {"id": sid, "user_id": uid, "started_at": NOW_ISO, "summary_snapshot": None}
+        ])
+
+    # -----------------------------------------------------------------------
+    # Test 1: Previous session with a non-empty summary → new session seeded
+    # -----------------------------------------------------------------------
+    @patch("app.services.summary_service.supabase")
+    @patch("app.services.chat_service.supabase")
+    def test_new_session_seeded_with_prior_summary(self, mock_chat_sb, mock_summary_sb):
+        """
+        When a prior session exists with a non-empty summary_snapshot,
+        create_session() must seed the new session with that summary.
+        """
+        # Prior session has a rich summary
+        self._make_select_mock(mock_chat_sb, [{"summary_snapshot": self.PRIOR_SUMMARY}])
+        self._make_insert_mock(mock_chat_sb)
+
+        # save_session_summary will call supabase via summary_service.supabase
+        mock_summary_sb.table.return_value.update.return_value \
+            .eq.return_value.execute.return_value = fake_result([{"id": TEST_SESSION_ID}])
+
+        from app.services.chat_service import create_session
+        row = create_session(TEST_USER_ID)
+
+        # The returned row must carry the seeded summary
+        assert row["summary_snapshot"] == self.PRIOR_SUMMARY
+        # Confirm save_session_summary (the UPDATE) was called on the summary table
+        mock_summary_sb.table.assert_called_with("sessions")
+
+    # -----------------------------------------------------------------------
+    # Test 2: First-ever user — no prior sessions → summary_snapshot stays None
+    # -----------------------------------------------------------------------
+    @patch("app.services.chat_service.supabase")
+    def test_first_ever_session_has_no_summary(self, mock_supabase):
+        """
+        A brand-new user with zero prior sessions must get summary_snapshot=None.
+        """
+        self._make_select_mock(mock_supabase, [])  # no prior sessions
+        self._make_insert_mock(mock_supabase)
+
+        from app.services.chat_service import create_session
+        row = create_session(TEST_USER_ID)
+
+        # No summary to seed — the row comes back with None
+        assert row.get("summary_snapshot") is None
+
+    # -----------------------------------------------------------------------
+    # Test 3: Prior session exists but summary_snapshot is NULL → new session clean
+    # -----------------------------------------------------------------------
+    @patch("app.services.chat_service.supabase")
+    def test_prior_session_with_null_summary_leaves_new_session_clean(self, mock_supabase):
+        """
+        If the previous session's summary_snapshot is NULL (e.g. session was
+        created but the user never sent a message), the new session starts clean.
+        """
+        self._make_select_mock(mock_supabase, [{"summary_snapshot": None}])
+        self._make_insert_mock(mock_supabase)
+
+        from app.services.chat_service import create_session
+        row = create_session(TEST_USER_ID)
+
+        assert row.get("summary_snapshot") is None
+
+    # -----------------------------------------------------------------------
+    # Test 4: Prior session summary is empty/whitespace → new session clean
+    # -----------------------------------------------------------------------
+    @patch("app.services.chat_service.supabase")
+    def test_prior_session_with_empty_summary_leaves_new_session_clean(self, mock_supabase):
+        """
+        An empty-string or whitespace-only summary_snapshot must not be seeded.
+        """
+        for empty_val in ("", "   ", "\n"):
+            self._make_select_mock(mock_supabase, [{"summary_snapshot": empty_val}])
+            self._make_insert_mock(mock_supabase)
+
+            from app.services.chat_service import create_session
+            row = create_session(TEST_USER_ID)
+
+            assert row.get("summary_snapshot") is None, \
+                f"Expected None for empty prior summary '{repr(empty_val)}', got {row.get('summary_snapshot')!r}"
+
+    # -----------------------------------------------------------------------
+    # Test 5: Supabase lookup failure → session creation still succeeds
+    # -----------------------------------------------------------------------
+    @patch("app.services.chat_service.supabase")
+    def test_supabase_lookup_failure_does_not_break_session_creation(self, mock_supabase):
+        """
+        If the Supabase query for the prior summary throws an exception,
+        create_session() must still complete successfully with summary_snapshot=None.
+        Graceful degradation: a missing prior summary must never block the user.
+        """
+        # Make the select chain raise an exception
+        mock_supabase.table.return_value.select.return_value \
+            .eq.return_value.order.return_value.limit.return_value.execute.side_effect = Exception("DB timeout")
+        # Insert still succeeds
+        self._make_insert_mock(mock_supabase)
+
+        resp = client.post("/sessions", headers=DEV_AUTH)
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["session_id"] == TEST_SESSION_ID
+        # No summary available — falls back gracefully
+        # (summary_snapshot is not part of SessionCreateResponse schema,
+        #  but session creation must not 500)
+
+    # -----------------------------------------------------------------------
+    # Test 6: User isolation — user A cannot receive user B's summary
+    # -----------------------------------------------------------------------
+    @patch("app.services.chat_service.supabase")
+    def test_prior_summary_scoped_to_authenticated_user(self, mock_supabase):
+        """
+        Security: get_latest_session_summary() must filter by user_id.
+        Verify the .eq() call is made with the correct user_id, so user A
+        can never receive user B's conversation context.
+        """
+        self._make_select_mock(mock_supabase, [])  # simulate no sessions for this user
+        self._make_insert_mock(mock_supabase)
+
+        from app.services.chat_service import get_latest_session_summary
+        # Call the helper directly with a specific user_id
+        get_latest_session_summary(TEST_USER_ID)
+
+        # Verify .eq() was called with the correct user_id on the sessions table
+        mock_supabase.table.assert_called_with("sessions")
+        eq_call_args = mock_supabase.table.return_value.select.return_value.eq.call_args
+        assert eq_call_args is not None, ".eq() was never called on the sessions query"
+        assert eq_call_args[0] == ("user_id", TEST_USER_ID), (
+            f"Expected .eq('user_id', '{TEST_USER_ID}') but got {eq_call_args[0]}"
+        )
+
+    # -----------------------------------------------------------------------
+    # Test 7: First chat message in seeded session passes prior context to LLM
+    # -----------------------------------------------------------------------
+    @patch("app.services.chat_service.supabase")
+    def test_first_chat_message_in_seeded_session_uses_prior_summary(self, mock_supabase):
+        """
+        End-to-end flow: when the new session was seeded with a prior summary,
+        the first POST /chat call must pass that summary as rolling_summary to
+        get_ai_response(), so the LLM has cross-session memory from turn 1.
+
+        Patch target is 'app.services.chat_service.get_ai_response' because
+        chat_service.py imports the function by name at module load time:
+            from app.services.llm_service import get_ai_response
+        Patching the name in the calling module's namespace is the correct way
+        to intercept calls made through an already-bound reference.
+        """
+        # Mock validate_session_ownership: returns session with the seeded summary
+        mock_supabase.table.return_value.select.return_value \
+            .eq.return_value.single.return_value.execute.return_value = fake_single_result({
+                "id": TEST_SESSION_ID,
+                "user_id": TEST_USER_ID,
+                "summary_snapshot": self.PRIOR_SUMMARY,  # ← seeded from prior session
+            })
+        # Message inserts (user msg + assistant msg)
+        mock_supabase.table.return_value.insert.return_value.execute.return_value = fake_result([
+            {"id": str(uuid.uuid4()), "session_id": TEST_SESSION_ID,
+             "sender": "user", "content": "hello", "created_at": NOW_ISO}
+        ])
+
+        from app.services.llm_service import AIResponse
+
+        # AsyncMock is required because send_chat_message() awaits get_ai_response()
+        mock_ai = AsyncMock(return_value=AIResponse(
+            reply="Main yahaan hoon, batao.",
+            severity="none",
+            category="none",
+            rationale="Normal conversation",
+        ))
+
+        # Patch in the calling module's namespace so the already-bound import is intercepted
+        with patch("app.services.chat_service.get_ai_response", mock_ai):
+            resp = client.post(
+                "/chat",
+                json={"session_id": TEST_SESSION_ID, "message": "Hi, I'm back."},
+                headers=DEV_AUTH,
+            )
+
+        assert resp.status_code == 200
+
+        # Confirm the mock was actually called (i.e. the chat endpoint ran fully)
+        assert mock_ai.called, "get_ai_response was never invoked — check the chat pipeline"
+
+        # Extract the rolling_summary kwarg that was passed to get_ai_response
+        call_kwargs = mock_ai.call_args.kwargs
+        actual_summary = call_kwargs.get("rolling_summary")
+        assert actual_summary == self.PRIOR_SUMMARY, (
+            f"Expected rolling_summary to equal the seeded prior summary, "
+            f"got: {actual_summary!r}"
+        )
 
 # ===========================================================================
 # 6. GET /sessions
