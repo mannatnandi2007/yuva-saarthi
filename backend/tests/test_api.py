@@ -860,3 +860,152 @@ class TestPhase4RollingSummary:
         assert "NIMHANS" in ctx
 
 
+# ===========================================================================
+# 15. Phase 4: Support Retrieval APIs (Khushal)
+#     Covers POST /rag/ingest, GET /rag/files, POST /rag/scan
+#     and validation edge cases on POST /rag/retrieve.
+# ===========================================================================
+
+class TestPhase4SupportRetrievalAPIs:
+    """
+    Phase 4 — Support Retrieval APIs (PRD §4 pgvector + §6 RAG ingestion).
+
+    Tests the full retrieval API surface:
+      - POST /rag/ingest  : happy path + empty-embedding rejection
+      - POST /rag/retrieve: empty query_text rejection (validation edge case)
+      - GET  /rag/files   : folder scan listing
+      - POST /rag/scan    : cache refresh + chunk count
+
+    Notes on patch targets:
+      - /rag/ingest uses a module-level `supabase` import in rag.py, so we
+        patch `app.routers.rag.supabase`.
+      - /rag/files and /rag/scan use LAZY in-function imports
+        (`from app.services.folder_rag_service import ...`). Python resolves
+        these against the service module's namespace at call time, so the
+        correct patch target is `app.services.folder_rag_service.<name>`.
+    """
+
+    # 1536-dimension embedding vector (OpenAI text-embedding-3-small spec)
+    SAMPLE_EMBEDDING = [0.01] * 1536
+
+    # -----------------------------------------------------------------------
+    # Test 1: POST /rag/ingest — happy path stores chunk and returns id
+    # -----------------------------------------------------------------------
+    @patch("app.routers.rag.supabase")
+    def test_ingest_stores_document_chunk(self, mock_supabase):
+        """
+        A valid ingest payload with a non-empty embedding must:
+          - Return HTTP 201 Created
+          - Return status=="success", the DB-assigned id, and embedding_dims==1536
+        """
+        mock_supabase.table.return_value.insert.return_value.execute.return_value = \
+            fake_result([{"id": "rag-doc-uuid-001"}])
+
+        resp = client.post("/rag/ingest", json={
+            "source": "NIMHANS Youth Mental Health Protocol",
+            "title": "Exam Stress Section 1",
+            "chunk_text": "Acknowledge academic pressure without dismissal.",
+            "embedding": self.SAMPLE_EMBEDDING,
+        })
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["status"] == "success"
+        assert data["id"] == "rag-doc-uuid-001"
+        assert data["embedding_dims"] == 1536
+
+    # -----------------------------------------------------------------------
+    # Test 2: POST /rag/ingest — empty embedding list is rejected (400)
+    # -----------------------------------------------------------------------
+    def test_ingest_rejects_empty_embedding(self):
+        """
+        An empty embedding list must be rejected with HTTP 400 before any
+        DB call is made. The error detail must explain the constraint.
+        """
+        resp = client.post("/rag/ingest", json={
+            "source": "WHO",
+            "title": "Grounding Techniques",
+            "chunk_text": "Breathe slowly and ground yourself.",
+            "embedding": [],
+        })
+        assert resp.status_code == 400
+        assert "Embedding vector cannot be empty" in resp.json()["detail"]
+
+    # -----------------------------------------------------------------------
+    # Test 3: POST /rag/retrieve — blank query_text rejected (400)
+    # -----------------------------------------------------------------------
+    def test_retrieve_rejects_empty_query(self):
+        """
+        A query_text that is empty or whitespace-only must return HTTP 400.
+        This validates the guard in the /retrieve endpoint before any
+        retrieval work begins.
+        """
+        for blank in ("", "   ", "\t"):
+            resp = client.post("/rag/retrieve", json={"query_text": blank, "limit": 2})
+            assert resp.status_code == 400, (
+                f"Expected 400 for blank query_text={blank!r}, got {resp.status_code}"
+            )
+            assert "query_text cannot be empty" in resp.json()["detail"]
+
+    # -----------------------------------------------------------------------
+    # Test 4: GET /rag/files — returns structured file listing
+    # -----------------------------------------------------------------------
+    @patch("app.services.folder_rag_service.scan_and_chunk_folder")
+    def test_rag_files_returns_file_listing(self, mock_scan):
+        """
+        GET /rag/files must return:
+          - HTTP 200
+          - total_files: count of distinct source filenames
+          - total_chunks: total number of chunks across all files
+          - files[]: list of {filename, chunks_count}
+        Patch target is the service module because rag.py imports lazily
+        inside the function body with `from app.services.folder_rag_service import ...`.
+        """
+        mock_scan.return_value = [
+            {"source": "who_guidelines.txt", "id": "who-1",
+             "title": "WHO Sec 1", "chunk_text": "..."},
+            {"source": "who_guidelines.txt", "id": "who-2",
+             "title": "WHO Sec 2", "chunk_text": "..."},
+            {"source": "nimhans_protocol.md", "id": "nim-1",
+             "title": "NIMHANS Sec 1", "chunk_text": "..."},
+        ]
+
+        resp = client.get("/rag/files")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total_files"] == 2
+        assert data["total_chunks"] == 3
+        filenames = [f["filename"] for f in data["files"]]
+        assert "who_guidelines.txt" in filenames
+        assert "nimhans_protocol.md" in filenames
+        # Chunk counts per file
+        file_map = {f["filename"]: f["chunks_count"] for f in data["files"]}
+        assert file_map["who_guidelines.txt"] == 2
+        assert file_map["nimhans_protocol.md"] == 1
+
+    # -----------------------------------------------------------------------
+    # Test 5: POST /rag/scan — invalidates cache and returns chunk count
+    # -----------------------------------------------------------------------
+    @patch("app.services.folder_rag_service.scan_and_chunk_folder")
+    @patch("app.services.folder_rag_service.refresh_folder_rag")
+    def test_rag_scan_returns_success(self, mock_refresh, mock_scan):
+        """
+        POST /rag/scan must:
+          - Call refresh_folder_rag() to invalidate the MiniLM embedding cache
+          - Call scan_and_chunk_folder() to re-index
+          - Return HTTP 200 with status=="success" and the correct total_chunks
+        """
+        mock_scan.return_value = [
+            {"source": "research.docx", "id": f"r-{i}",
+             "title": f"Research Sec {i}", "chunk_text": "..."}
+            for i in range(7)  # simulate 7 chunks after re-scan
+        ]
+
+        resp = client.post("/rag/scan")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "success"
+        assert data["total_chunks"] == 7
+        assert "re-scanned" in data["message"].lower()
+        # Verify cache was actually invalidated before re-indexing
+        mock_refresh.assert_called_once()
+        mock_scan.assert_called_once()
