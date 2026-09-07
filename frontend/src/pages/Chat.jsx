@@ -159,7 +159,10 @@ export default function Chat({ userSession, onLogout }) {
 
       const risk = data.risk_classification;
       const action = data.action_taken;
-
+      
+      setActiveHelplines([]);
+      setActiveSafeguard(null);
+      
       // Handle crisis safety routing
       if (action === 'routed_to_helpline' || (risk?.category === 'abuse' && risk?.severity === 'high')) {
         setActiveSafeguard("abuse_bypass");
