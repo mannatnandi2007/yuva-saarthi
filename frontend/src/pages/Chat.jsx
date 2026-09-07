@@ -62,18 +62,24 @@ export default function Chat({ userSession, onLogout }) {
 
       // 1. Fetch prior session list for history sidebar
       try {
-        const listRes = await axios.get(`${API_BASE_URL}/sessions`, { headers, timeout: 3000 });
+        const listRes = await axios.get(`${API_BASE_URL}/sessions`, {
+          headers,
+          timeout: 3000
+        });
+      
         if (Array.isArray(listRes.data)) {
           setSessionsList(listRes.data);
         }
       } catch (err) {
         console.debug("Could not fetch sessions list; starting local session.");
       }
+      
+      // Yashika Phase 5: Load emergency contacts
       try {
-        const contactsRes = await axios.get(
-          `${API_BASE_URL}/contacts`,
-          { headers, timeout: 3000 }
-        );
+        const contactsRes = await axios.get(`${API_BASE_URL}/contacts`, {
+          headers,
+          timeout: 3000
+        });
       
         if (Array.isArray(contactsRes.data)) {
           setEmergencyContacts(contactsRes.data);
@@ -81,6 +87,7 @@ export default function Chat({ userSession, onLogout }) {
       } catch (err) {
         console.debug("Could not load emergency contacts.");
       }
+      
       // 2. Start a fresh new chat session on login
       await createNewChat();
     };
