@@ -31,6 +31,7 @@ export default function Chat({ userSession, onLogout }) {
   // Active crisis state if triggered
   const [activeHelplines, setActiveHelplines] = useState([]);
   const [activeSafeguard, setActiveSafeguard] = useState(null);
+  const [emergencyContacts, setEmergencyContacts] = useState([]);
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -68,7 +69,18 @@ export default function Chat({ userSession, onLogout }) {
       } catch (err) {
         console.debug("Could not fetch sessions list; starting local session.");
       }
-
+      try {
+        const contactsRes = await axios.get(
+          `${API_BASE_URL}/contacts`,
+          { headers, timeout: 3000 }
+        );
+      
+        if (Array.isArray(contactsRes.data)) {
+          setEmergencyContacts(contactsRes.data);
+        }
+      } catch (err) {
+        console.debug("Could not load emergency contacts.");
+      }
       // 2. Start a fresh new chat session on login
       await createNewChat();
     };
