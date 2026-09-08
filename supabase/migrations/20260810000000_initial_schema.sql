@@ -7,13 +7,23 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Create custom enum for action_taken in risk_events
 -- As per PRD §5: call_placed / sms_sent / attempted_failed / logged_only / routed_to_helpline
-CREATE TYPE action_taken_type AS ENUM (
-    'call_placed',
-    'sms_sent',
-    'attempted_failed',
-    'logged_only',
-    'routed_to_helpline'
-);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_type
+        WHERE typname = 'action_taken_type'
+    ) THEN
+        CREATE TYPE action_taken_type AS ENUM (
+            'call_placed',
+            'sms_sent',
+            'attempted_failed',
+            'logged_only',
+            'routed_to_helpline'
+        );
+    END IF;
+END
+$$;
 
 -- Users Table
 -- Reference: PRD §3.1 and §5
