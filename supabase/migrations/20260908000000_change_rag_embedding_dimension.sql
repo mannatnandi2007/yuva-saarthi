@@ -1,0 +1,2 @@
+ALTER TABLE rag_documents
+ALTER COLUMN embedding TYPE VECTOR(384);
