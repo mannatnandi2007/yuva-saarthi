@@ -9,7 +9,10 @@ from typing import List, Tuple
 
 ENGLISH_TERMS: List[str] = [
     # Self-Harm & Suicide
+    r"suicid\w*",
     r"suicide",
+    r"suiciding",
+    r"suicidal",
     r"kill myself",
     r"want to die",
     r"hurt myself",
@@ -18,6 +21,9 @@ ENGLISH_TERMS: List[str] = [
     r"slit my wrist",
     r"end my life",
     r"end it all",
+    r"give up on life",
+    r"giving up",
+    r"feel like giving up",
     r"overdose",
     r"can't take this pain",
     r"disappear forever",
@@ -73,6 +79,11 @@ ENGLISH_TERMS: List[str] = [
 HINGLISH_TERMS: List[str] = [
     # Self-Harm & Suicide (Roman Script / Hinglish)
     r"suicide karna",
+    r"suicide kr",
+    r"suicide kar",
+    r"mar rha hu",
+    r"mar raha hu",
+    r"marna hai",
     r"jaan de dunga",
     r"jaan de dungi",
     r"apne aap ko nuksan",

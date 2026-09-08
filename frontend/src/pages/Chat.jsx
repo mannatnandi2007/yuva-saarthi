@@ -1,26 +1,48 @@
-// YUVAA Saarthi — ChatGPT-style Clean Companion Interface
-// Modern dark-mode layout with sidebar history, new chat, and seamless crisis routing
+// YUVAA Saarthi — Surreal Companion Interface
+// Hallmark: Cold Snap × Hyperlane × Off-Register (Red & Pink Theme)
+// Featuring Synaptic Brain Avatars, Chromatic Shadows, & Crisis Escalation Card
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Send, Plus, MessageSquare, LogOut, Heart, PhoneCall, 
-  PanelLeftClose, PanelLeft, Sparkles, User, ShieldAlert, 
-  ExternalLink, Loader2 
+  Send, Plus, MessageSquare, Heart, PhoneCall, 
+  PanelLeftClose, PanelLeft, ShieldAlert, 
+  Users, Shield, Loader2, Sparkles, Trash2
 } from 'lucide-react';
 import axios from 'axios';
+import BrainLogo from '../components/BrainLogo.jsx';
 
-// BUG-010 FIX: Use VITE_API_URL env variable for production deployments (Vercel)
-// Set VITE_API_URL=https://your-backend.railway.app in Vercel environment variables
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const SUGGESTED_PROMPTS = [
-  { label: "Exam Stress", text: "Exams ko lekar bohot zyada stress aur pressure feel ho raha hai." },
-  { label: "Feeling Overwhelmed", text: "I am feeling overwhelmed and don't know what to do." },
-  { label: "Family Tension", text: "Ghar pe bohot tension chal rahi hai, samajh nahi aa raha kaise handle karoon." },
-  { label: "Need to Vent", text: "I just feel really lonely today and need someone safe to talk to." }
+  { 
+    label: "Exam Stress & Pressure", 
+    text: "Exams ko lekar bohot zyada stress aur pressure feel ho raha hai, padhai me dhyan nahi lag raha.",
+    tag: "ACADEMIC" 
+  },
+  { 
+    label: "Feeling Overwhelmed", 
+    text: "I am feeling extremely overwhelmed today and my chest feels heavy.",
+    tag: "SOMATIC" 
+  },
+  { 
+    label: "Family Conflict", 
+    text: "Ghar pe bohot tension chal rahi hai parents ke sath, bohot comparisons ho rahe hain.",
+    tag: "INTERPERSONAL" 
+  },
+  { 
+    label: "Loneliness & Isolation", 
+    text: "I feel really isolated and alone right now, aisa lagta hai koi samajhta nahi hai.",
+    tag: "SUPPORT" 
+  }
 ];
 
-export default function Chat({ userSession, onLogout }) {
+export default function Chat({ 
+  userSession, 
+  onLogout, 
+  onOpenContacts, 
+  onOpenPolicy, 
+  emergencyContacts = [] 
+}) {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [activeSessionId, setActiveSessionId] = useState(null);
@@ -31,7 +53,6 @@ export default function Chat({ userSession, onLogout }) {
   // Active crisis state if triggered
   const [activeHelplines, setActiveHelplines] = useState([]);
   const [activeSafeguard, setActiveSafeguard] = useState(null);
-  const [emergencyContacts, setEmergencyContacts] = useState([]);
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -55,40 +76,21 @@ export default function Chat({ userSession, onLogout }) {
     return headers;
   };
 
-  // Load session history and initialize fresh new chat on startup
+  // Initialize fresh chat on startup
   useEffect(() => {
     const initChat = async () => {
       const headers = getAuthHeaders();
 
-      // 1. Fetch prior session list for history sidebar
+      // Fetch session history for sidebar
       try {
-        const listRes = await axios.get(`${API_BASE_URL}/sessions`, {
-          headers,
-          timeout: 3000
-        });
-      
+        const listRes = await axios.get(`${API_BASE_URL}/sessions`, { headers, timeout: 3000 });
         if (Array.isArray(listRes.data)) {
           setSessionsList(listRes.data);
         }
       } catch (err) {
-        console.debug("Could not fetch sessions list; starting local session.");
+        console.debug("Could not fetch sessions list; local fallback active.");
       }
-      
-      // Yashika Phase 5: Load emergency contacts
-      try {
-        const contactsRes = await axios.get(`${API_BASE_URL}/contacts`, {
-          headers,
-          timeout: 3000
-        });
-      
-        if (Array.isArray(contactsRes.data)) {
-          setEmergencyContacts(contactsRes.data);
-        }
-      } catch (err) {
-        console.debug("Could not load emergency contacts.");
-      }
-      
-      // 2. Start a fresh new chat session on login
+
       await createNewChat();
     };
 
@@ -99,7 +101,7 @@ export default function Chat({ userSession, onLogout }) {
     setIsLoading(true);
     setActiveHelplines([]);
     setActiveSafeguard(null);
-    setMessages([]); // Clean empty state with prompt suggestions like ChatGPT
+    setMessages([]);
 
     try {
       const headers = getAuthHeaders();
@@ -108,7 +110,7 @@ export default function Chat({ userSession, onLogout }) {
         const newId = res.data.session_id;
         setActiveSessionId(newId);
         setSessionsList(prev => [
-          { session_id: newId, started_at: new Date().toISOString(), title: "New Conversation" },
+          { session_id: newId, started_at: new Date().toISOString(), heading: "New Safe Chat", title: "New Safe Chat" },
           ...prev.filter(s => s.session_id !== newId)
         ]);
       }
@@ -116,12 +118,46 @@ export default function Chat({ userSession, onLogout }) {
       const fallbackId = 'local-' + Date.now();
       setActiveSessionId(fallbackId);
       setSessionsList(prev => [
-        { session_id: fallbackId, started_at: new Date().toISOString(), title: "New Conversation" },
+        { session_id: fallbackId, started_at: new Date().toISOString(), heading: "New Safe Chat", title: "New Safe Chat" },
         ...prev
       ]);
     } finally {
       setIsLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  };
+
+  const handleDeleteSession = async (sessionId, e) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm("Are you sure you want to delete this chat?")) return;
+    try {
+      const headers = getAuthHeaders();
+      await axios.delete(`${API_BASE_URL}/sessions/${sessionId}`, { headers, timeout: 5000 });
+    } catch (err) {
+      console.warn("Delete session error:", err);
+    } finally {
+      setSessionsList(prev => prev.filter(s => s.session_id !== sessionId));
+      if (activeSessionId === sessionId) {
+        const remaining = sessionsList.filter(s => s.session_id !== sessionId);
+        if (remaining.length > 0) {
+          loadSession(remaining[0].session_id);
+        } else {
+          createNewChat();
+        }
+      }
+    }
+  };
+
+  const handleDeleteAllSessions = async () => {
+    if (!window.confirm("Are you sure you want to delete ALL previous conversation history? This cannot be undone.")) return;
+    try {
+      const headers = getAuthHeaders();
+      await axios.delete(`${API_BASE_URL}/sessions`, { headers, timeout: 5000 });
+    } catch (err) {
+      console.warn("Delete all sessions error:", err);
+    } finally {
+      setSessionsList([]);
+      createNewChat();
     }
   };
 
@@ -148,85 +184,62 @@ export default function Chat({ userSession, onLogout }) {
   };
 
   const handleSendMessage = async (textOverride) => {
-    const text = (textOverride || inputText).trim();
-    if (!text || isLoading) return;
+    const textToSend = textOverride || inputText;
+    if (!textToSend.trim() || isLoading) return;
 
-    const userMessage = { sender: 'user', content: text };
+    const userMessage = { sender: 'user', content: textToSend.trim() };
     setMessages(prev => [...prev, userMessage]);
-    setInputText('');
+    if (!textOverride) setInputText('');
     setIsLoading(true);
-
-    // Update session title in history if first message
-    if (messages.length === 0 && activeSessionId) {
-      setSessionsList(prev => prev.map(s => 
-        s.session_id === activeSessionId ? { ...s, title: text.slice(0, 28) + (text.length > 28 ? '...' : '') } : s
-      ));
-    }
 
     try {
       const headers = getAuthHeaders();
-      const sessionId = activeSessionId || 'local-' + Date.now();
-
-      const response = await axios.post(
-        `${API_BASE_URL}/chat`,
-        { session_id: sessionId, message: text },
-        { headers, timeout: 10000 }
-      );
+      const response = await axios.post(`${API_BASE_URL}/chat`, {
+        session_id: activeSessionId || 'default-session',
+        message: textToSend.trim()
+      }, { headers, timeout: 45000 });
 
       const data = response.data;
-      setMessages(prev => [...prev, { sender: 'assistant', content: data.reply }]);
+      const assistantMessage = { sender: 'assistant', content: data.reply };
+      setMessages(prev => [...prev, assistantMessage]);
+
+      if (data.heading) {
+        setSessionsList(prev => prev.map(s => 
+          s.session_id === activeSessionId ? { ...s, heading: data.heading, title: data.heading } : s
+        ));
+      }
 
       const risk = data.risk_classification;
       const action = data.action_taken;
-      
+
       setActiveHelplines([]);
       setActiveSafeguard(null);
-      
-      // Handle crisis safety routing
+
+      // Handle safety routing
       if (action === 'routed_to_helpline' || (risk?.category === 'abuse' && risk?.severity === 'high')) {
         setActiveSafeguard("abuse_bypass");
         setActiveHelplines([
-          { name: "Childline India", number: "1098", desc: "Confidential 24/7 child & youth safety line" },
-          { name: "KIRAN Helpline", number: "1800-599-0019", desc: "National mental health 24/7 toll-free" }
+          { name: "Childline India (Youth Protection)", number: "1098", desc: "24/7 Toll-Free Child & Youth Distress Support" },
+          { name: "KIRAN National Helpline", number: "1800-599-0019", desc: "Govt of India Mental Health Helpline" }
         ]);
-      } else if (risk?.severity === 'high' && risk?.category === 'self_harm') {
-        setActiveSafeguard("self_harm_alert");
+      } else if (action === 'call_placed' || risk?.severity === 'high') {
+        setActiveSafeguard("escalation_triggered");
         setActiveHelplines([
-          { name: "KIRAN Helpline", number: "1800-599-0019", desc: "Immediate 24/7 crisis support" },
-          { name: "Tele-MANAS", number: "14416", desc: "Govt of India tele-mental health service" }
+          { name: "Tele-MANAS National Helpline", number: "14416", desc: "24/7 Comprehensive Mental Health Support" },
+          { name: "Vandrevala Foundation", number: "+91 9999 666 555", desc: "24/7 Crisis Intervention & Counseling" }
         ]);
       }
 
-    } catch (err) {
-      // Local graceful fallback
-      const textLower = text.toLowerCase();
-      if (textLower.includes('marte') || textLower.includes('beat') || textLower.includes('abuse')) {
-        setActiveSafeguard("abuse_bypass");
-        setActiveHelplines([
-          { name: "Childline India", number: "1098", desc: "24/7 youth safety & protection" },
-          { name: "KIRAN Helpline", number: "1800-599-0019", desc: "Confidential mental health support" }
-        ]);
-        setMessages(prev => [...prev, {
-          sender: 'assistant',
-          content: "Tumhari safety humare liye sabse important hai. Aapki privacy protected hai aur personal contacts ko contact nahi kiya jayega. Please Childline 1098 ya KIRAN 1800-599-0019 se help lo."
-        }]);
-      } else if (textLower.includes('suicide') || textLower.includes('marna') || textLower.includes('kill myself')) {
-        setActiveSafeguard("self_harm_alert");
-        setActiveHelplines([
-          { name: "KIRAN Helpline", number: "1800-599-0019", desc: "Free, confidential 24/7 crisis line" }
-        ]);
-        setMessages(prev => [...prev, {
-          sender: 'assistant',
-          content: "Main tumhari baat sun raha hoon. Please kisi trusted adult ya KIRAN Helpline (1800-599-0019) se baat karo. You are not alone."
-        }]);
-      } else {
-        setMessages(prev => [...prev, {
-          sender: 'assistant',
-          content: "I hear you. Main yahan hoon aapke saath. Jo bhi dil me hai, khul ke share karo — I am here to listen."
-        }]);
-      }
+    } catch (error) {
+      console.error("Chat error:", error);
+      const errDetail = error.response?.data?.detail || "Could not connect to the YUVAA Saarthi server. Please make sure the backend is running.";
+      setMessages(prev => [...prev, { 
+        sender: 'assistant', 
+        content: `⚠️ ${errDetail}` 
+      }]);
     } finally {
       setIsLoading(false);
+      setTimeout(() => inputRef.current?.focus(), 100);
     }
   };
 
@@ -237,333 +250,304 @@ export default function Chat({ userSession, onLogout }) {
     }
   };
 
-  const displayPhone = userSession?.user_phone || userSession?.phone || "+91 ••••• •••••";
-
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100vw', background: '#09090b', color: '#f4f4f5', overflow: 'hidden' }}>
+    <div style={{ flex: 1, display: 'flex', height: 'calc(100vh - 61px)', overflow: 'hidden', background: 'var(--bg-primary)' }}>
       
-      {/* ========================================================================= */}
-      {/* 1. LEFT SIDEBAR (ChatGPT Style)                                           */}
-      {/* ========================================================================= */}
-      <aside style={{
-        width: sidebarOpen ? '260px' : '0px',
-        minWidth: sidebarOpen ? '260px' : '0px',
-        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-        background: '#121215',
-        borderRight: '1px solid rgba(255, 255, 255, 0.08)',
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        overflow: 'hidden',
-        position: 'relative'
-      }}>
-        
-        {/* Top Header & New Chat Button */}
-        <div style={{ padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      {/* Hyperlane Left Sidebar */}
+      <aside 
+        style={{
+          width: sidebarOpen ? '280px' : '0px',
+          transition: 'width 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+          overflow: 'hidden',
+          background: 'var(--bg-secondary)',
+          borderRight: sidebarOpen ? '1px solid var(--border-medium)' : 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          flexShrink: 0,
+          zIndex: 20
+        }}
+      >
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minWidth: '280px' }}>
           
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '8px',
-                background: 'linear-gradient(135deg, #6366f1, #a855f7)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <Heart size={16} color="#fff" fill="#fff" />
-              </div>
-              <span style={{ fontWeight: '700', fontSize: '1rem', letterSpacing: '-0.02em' }}>
-                YUVAA <span style={{ color: '#a855f7' }}>Saarthi</span>
-              </span>
-            </div>
-
-            <button
-              onClick={() => setSidebarOpen(false)}
-              style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}
-              title="Close sidebar"
-            >
-              <PanelLeftClose size={18} />
-            </button>
-          </div>
-
           {/* New Chat Button */}
           <button
             onClick={createNewChat}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              width: '100%',
-              padding: '10px 14px',
-              borderRadius: '10px',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              background: 'rgba(255, 255, 255, 0.04)',
-              color: '#f4f4f5',
-              cursor: 'pointer',
-              fontSize: '0.88rem',
-              fontWeight: '500',
-              transition: 'background 0.2s ease'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'}
+            className="hallmark-btn-primary"
+            style={{ width: '100%', padding: '10px 16px', fontSize: '0.86rem' }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Plus size={16} />
-              <span>New chat</span>
-            </div>
-            <Sparkles size={14} style={{ color: '#a855f7' }} />
+            <Plus size={16} />
+            <span>New Safe Chat</span>
           </button>
 
-        </div>
-
-        {/* Middle: Chat History Sessions */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 10px' }}>
-          <div style={{ fontSize: '0.72rem', color: '#71717a', fontWeight: '600', padding: '8px 10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Recent Conversations
+          {/* Session History Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 6px', marginTop: '6px' }}>
+            <span className="mono-telemetry" style={{ fontSize: '0.66rem' }}>CONVERSATION LOG</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{sessionsList.length}</span>
+              {sessionsList.length > 0 && (
+                <button
+                  onClick={handleDeleteAllSessions}
+                  title="Clear all chat history"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '2px 4px',
+                    cursor: 'pointer',
+                    color: 'var(--text-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                    fontSize: '0.68rem',
+                    borderRadius: '4px',
+                    transition: 'color 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-crimson)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+                >
+                  <Trash2 size={11} />
+                  <span>Clear All</span>
+                </button>
+              )}
+            </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {sessionsList.length === 0 ? (
-              <div style={{ padding: '12px 10px', fontSize: '0.82rem', color: '#52525b' }}>
-                No prior chats yet
-              </div>
-            ) : (
-              sessionsList.map((session) => {
-                const isActive = session.session_id === activeSessionId;
-                const title = session.title || "Chat Session";
-                return (
+          {/* Sessions List */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto', flex: 1 }}>
+            {sessionsList.map((s) => {
+              const isActive = s.session_id === activeSessionId;
+              const displayHeading = s.heading || s.title || (s.summary_snapshot ? s.summary_snapshot.replace(/^Heading:\s*/, '').slice(0, 26) + '...' : `Chat ${s.session_id.slice(0, 6)}`);
+              return (
+                <div
+                  key={s.session_id}
+                  onClick={() => loadSession(s.session_id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: 'var(--radius-md)',
+                    border: isActive ? '1px solid var(--border-glow)' : '1px solid transparent',
+                    background: isActive ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
+                    color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
+                    cursor: 'pointer',
+                    fontSize: '0.82rem',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                      e.currentTarget.style.color = 'var(--text-secondary)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = 'var(--text-muted)';
+                    }
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1, minWidth: 0 }}>
+                    <MessageSquare size={14} color={isActive ? 'var(--accent-blue-core)' : 'var(--text-muted)'} style={{ flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: isActive ? '600' : '400' }}>
+                      {displayHeading}
+                    </span>
+                  </div>
                   <button
-                    key={session.session_id}
-                    onClick={() => loadSession(session.session_id)}
+                    onClick={(e) => handleDeleteSession(s.session_id, e)}
+                    title="Delete this conversation"
                     style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: '4px',
+                      cursor: 'pointer',
+                      color: 'var(--text-muted)',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '10px',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: isActive ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-                      color: isActive ? '#f4f4f5' : '#a1a1aa',
-                      fontSize: '0.84rem',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      width: '100%',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
+                      justifyContent: 'center',
+                      borderRadius: '4px',
+                      opacity: isActive ? 0.8 : 0.4,
+                      transition: 'all 0.15s ease'
                     }}
                     onMouseEnter={(e) => {
-                      if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                      e.currentTarget.style.color = 'var(--accent-crimson)';
+                      e.currentTarget.style.opacity = '1';
                     }}
                     onMouseLeave={(e) => {
-                      if (!isActive) e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = 'var(--text-muted)';
+                      e.currentTarget.style.opacity = isActive ? '0.8' : '0.4';
                     }}
                   >
-                    <MessageSquare size={15} style={{ flexShrink: 0, color: isActive ? '#a855f7' : '#71717a' }} />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {title}
-                    </span>
+                    <Trash2 size={13} />
                   </button>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        {/* Bottom: User Profile & Logout */}
-        <div style={{
-          padding: '14px',
-          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-          background: 'rgba(0, 0, 0, 0.2)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px'
-        }}>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              background: '#27272a',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#d4d4d8'
-            }}>
-              <User size={16} />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '0.82rem', fontWeight: '600', color: '#f4f4f5', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {userSession?.username ? `@${userSession.username}` : (userSession?.first_name ? `${userSession.first_name} ${userSession.last_name}` : displayPhone)}
-              </div>
-              <div style={{ fontSize: '0.72rem', color: '#71717a' }}>
-                {userSession?.first_name ? `${userSession.first_name} ${userSession.last_name}` : 'Verified Profile'}
-              </div>
-            </div>
+                </div>
+              );
+            })}
           </div>
 
-          <button
-            onClick={onLogout}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 10px',
-              borderRadius: '6px',
-              border: 'none',
-              background: 'none',
-              color: '#ef4444',
-              cursor: 'pointer',
-              fontSize: '0.82rem',
-              marginTop: '4px',
-              transition: 'background 0.2s ease'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
-          >
-            <LogOut size={14} />
-            <span>Log out</span>
-          </button>
+          {/* Sidebar Footer Controls */}
+          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button
+              onClick={onOpenContacts}
+              className="hallmark-btn-secondary"
+              style={{ width: '100%', justifyContent: 'flex-start', padding: '8px 12px', fontSize: '0.8rem' }}
+            >
+              <Users size={14} color="var(--accent-pink)" />
+              <span>Safety Network ({emergencyContacts.length})</span>
+            </button>
+
+            <button
+              onClick={onOpenPolicy}
+              className="hallmark-btn-secondary"
+              style={{ width: '100%', justifyContent: 'flex-start', padding: '8px 12px', fontSize: '0.8rem' }}
+            >
+              <Shield size={14} color="var(--accent-crimson)" />
+              <span>Safety Charter & Protocol</span>
+            </button>
+          </div>
 
         </div>
-
       </aside>
 
-      {/* ========================================================================= */}
-      {/* 2. MAIN CHAT AREA (ChatGPT Style)                                         */}
-      {/* ========================================================================= */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+      {/* Main Chat Stream Container */}
+      <section style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
         
-        {/* Top Minimal Bar */}
+        {/* Top Header Bar with Active Chat Heading & Controls */}
         <header style={{
-          height: '52px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 20px',
-          background: 'rgba(9, 9, 11, 0.7)',
-          backdropFilter: 'blur(10px)',
-          zIndex: 10
+          padding: '10px 18px',
+          borderBottom: '1px solid var(--border-subtle)',
+          background: 'rgba(5, 9, 20, 0.75)',
+          backdropFilter: 'blur(12px)',
+          zIndex: 10,
+          flexShrink: 0
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {!sidebarOpen && (
-              <button
-                onClick={() => setSidebarOpen(true)}
-                style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
-                title="Open sidebar"
-              >
-                <PanelLeft size={20} />
-              </button>
-            )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontWeight: '600', fontSize: '0.95rem' }}>YUVAA Saarthi</span>
-              <span style={{
-                background: 'rgba(168, 85, 247, 0.12)',
-                color: '#c084fc',
-                fontSize: '0.72rem',
-                padding: '2px 8px',
-                borderRadius: '12px',
-                border: '1px solid rgba(168, 85, 247, 0.25)'
-              }}>
-                Hinglish Companion
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              style={{
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '8px',
+                color: 'var(--text-muted)',
+                padding: '6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease'
+              }}
+              title={sidebarOpen ? "Collapse sidebar" : "Open sidebar"}
+            >
+              {sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeft size={16} />}
+            </button>
+
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+                {sessionsList.find(s => s.session_id === activeSessionId)?.heading || 
+                 sessionsList.find(s => s.session_id === activeSessionId)?.title || 
+                 (messages.length > 0 ? "Active Conversation" : "Safe Neural Chat")}
+              </span>
+              <span className="mono-telemetry" style={{ fontSize: '0.62rem', color: 'var(--accent-blue-core)' }}>
+                CONFIDENTIAL NEURAL COMPANION // END-TO-END SECURE
               </span>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#71717a' }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e' }}></span>
-            <span>Private & Confidential</span>
-          </div>
+          {activeSessionId && (
+            <button
+              onClick={(e) => handleDeleteSession(activeSessionId, e)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '5px 10px',
+                background: 'rgba(255, 30, 86, 0.08)',
+                border: '1px solid rgba(255, 30, 86, 0.22)',
+                borderRadius: 'var(--radius-pill)',
+                color: 'var(--accent-rose)',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              title="Delete current conversation"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 30, 86, 0.18)';
+                e.currentTarget.style.borderColor = 'var(--accent-crimson)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 30, 86, 0.08)';
+                e.currentTarget.style.borderColor = 'rgba(255, 30, 86, 0.22)';
+              }}
+            >
+              <Trash2 size={12} />
+              <span>Delete Chat</span>
+            </button>
+          )}
         </header>
 
-        {/* Chat Conversation Scroll Area */}
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          padding: '24px 16px'
-        }}>
+        {/* Chat Messages Scrolling Window */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           
           <div style={{ width: '100%', maxWidth: '768px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             
-            {/* Empty State: ChatGPT Greeting & Suggestion Pills */}
+            {/* Empty State / Surreal Hero */}
             {messages.length === 0 ? (
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center',
-                paddingTop: '60px',
-                gap: '24px'
-              }} className="animate-slideup">
-                
-                <div style={{
-                  width: '56px',
-                  height: '56px',
-                  borderRadius: '16px',
-                  background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+              <div 
+                style={{
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 8px 24px rgba(168, 85, 247, 0.25)'
-                }}>
-                  <Heart size={28} color="#fff" fill="#fff" />
-                </div>
+                  textAlign: 'center',
+                  paddingTop: '40px',
+                  gap: '20px'
+                }} 
+                className="animate-slideup"
+              >
+                <BrainLogo size={68} animated={true} />
 
                 <div>
-                  <h1 style={{ fontSize: '1.75rem', fontWeight: '700', letterSpacing: '-0.02em', marginBottom: '8px' }}>
+                  <div className="mono-telemetry" style={{ marginBottom: '6px' }}>
+                    YUVAA SAARTHI // NEURAL COMPANION
+                  </div>
+                  <h1 style={{ fontSize: '1.85rem', fontWeight: '800', letterSpacing: '-0.02em', margin: 0 }} className="off-register-text">
                     How can I support you today?
                   </h1>
-                  <p style={{ color: '#a1a1aa', fontSize: '0.95rem', maxWidth: '520px', margin: '0 auto', lineHeight: '1.5' }}>
-                    Main aapka confidential companion hoon. English ya Hinglish me apni feelings, stress, ya thoughts bina kisi jhijhak share karein.
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', maxWidth: '520px', margin: '10px auto 0', lineHeight: '1.5' }}>
+                    Main aapka confidential companion hoon. English ya Hinglish me apni feelings, exam stress, ya overthinking bina kisi jhijhak share karein.
                   </p>
                 </div>
 
-                {/* 4 Suggestion Pills */}
+                {/* 4 Prompt Pills (Cold Snap high-contrast cards) */}
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
                   gap: '12px',
                   width: '100%',
-                  marginTop: '16px'
+                  marginTop: '12px'
                 }}>
                   {SUGGESTED_PROMPTS.map((prompt, idx) => (
                     <button
                       key={idx}
                       onClick={() => handleSendMessage(prompt.text)}
+                      className="glass-panel"
                       style={{
                         padding: '16px',
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
-                        borderRadius: '12px',
-                        color: '#d4d4d8',
-                        fontSize: '0.86rem',
                         textAlign: 'left',
                         cursor: 'pointer',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '6px',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
-                        e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.3)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                        background: 'rgba(18, 7, 12, 0.65)'
                       }}
                     >
-                      <span style={{ fontWeight: '600', color: '#f4f4f5' }}>{prompt.label}</span>
-                      <span style={{ color: '#71717a', fontSize: '0.8rem', lineHeight: '1.4' }}>{prompt.text}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '0.9rem' }}>{prompt.label}</span>
+                        <span className="mono-telemetry" style={{ fontSize: '0.62rem', opacity: 0.7 }}>{prompt.tag}</span>
+                      </div>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: '1.4' }}>{prompt.text}</span>
                     </button>
                   ))}
                 </div>
@@ -585,30 +569,20 @@ export default function Chat({ userSession, onLogout }) {
                     className="animate-slideup"
                   >
                     {!isUser && (
-                      <div style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #6366f1, #a855f7)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        marginTop: '2px'
-                      }}>
-                        <Sparkles size={16} color="#fff" />
-                      </div>
+                      <BrainLogo size={32} animated={false} />
                     )}
 
                     <div style={{
                       maxWidth: '82%',
-                      padding: isUser ? '12px 18px' : '8px 4px',
-                      borderRadius: isUser ? '20px' : '0',
-                      background: isUser ? '#27272a' : 'transparent',
-                      color: isUser ? '#f4f4f5' : '#e4e4e7',
-                      fontSize: '0.96rem',
+                      padding: isUser ? '12px 18px' : '12px 16px',
+                      borderRadius: isUser ? '18px 18px 4px 18px' : '4px 18px 18px 18px',
+                      background: isUser ? 'linear-gradient(135deg, rgba(255, 30, 86, 0.18), rgba(244, 114, 182, 0.14))' : 'rgba(255, 255, 255, 0.03)',
+                      border: isUser ? '1px solid var(--border-glow)' : '1px solid var(--border-subtle)',
+                      color: isUser ? 'var(--text-primary)' : 'var(--text-secondary)',
+                      fontSize: '0.94rem',
                       lineHeight: '1.6',
-                      whiteSpace: 'pre-wrap'
+                      whiteSpace: 'pre-wrap',
+                      boxShadow: isUser ? '2px 2px 0 rgba(255, 30, 86, 0.2)' : 'none'
                     }}>
                       {msg.content}
                     </div>
@@ -617,54 +591,49 @@ export default function Chat({ userSession, onLogout }) {
               })
             )}
 
-            {/* Typing indicator */}
+            {/* Thinking / Loader Indicator */}
             {isLoading && (
-              <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #6366f1, #a855f7)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  <Loader2 size={16} color="#fff" className="animate-spin" />
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <BrainLogo size={28} animated={true} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-pink)', fontSize: '0.84rem' }}>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span className="mono-telemetry" style={{ fontSize: '0.74rem' }}>PROCESSING NEURAL CONTEXT...</span>
                 </div>
-                <span style={{ color: '#71717a', fontSize: '0.88rem' }}>Thinking...</span>
               </div>
             )}
 
-            {/* Crisis Support Card (Cleanly surfaced without flashy slop) */}
+            {/* Crisis Alert Card (When High Risk / Rule 3.4a triggered) */}
             {activeHelplines.length > 0 && (
-              <div style={{
-                background: 'rgba(239, 68, 68, 0.06)',
-                border: '1px solid rgba(239, 68, 68, 0.25)',
-                borderRadius: '14px',
-                padding: '18px 20px',
-                marginTop: '12px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '14px'
-              }} className="animate-slideup">
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#f87171' }}>
-                  <ShieldAlert size={20} />
-                  <span style={{ fontWeight: '700', fontSize: '0.95rem' }}>
+              <div 
+                style={{
+                  background: 'rgba(255, 30, 86, 0.08)',
+                  border: '1px solid var(--accent-crimson)',
+                  borderRadius: '16px',
+                  padding: '20px',
+                  marginTop: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px',
+                  boxShadow: '0 8px 30px rgba(255, 30, 86, 0.2)'
+                }} 
+                className="animate-slideup"
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--accent-crimson)' }}>
+                  <ShieldAlert size={22} />
+                  <span style={{ fontWeight: '800', fontSize: '1rem' }} className="off-register-text">
                     {activeSafeguard === 'abuse_bypass' 
-                      ? 'Confidential Helpline Support Available' 
-                      : 'Immediate Crisis Support Lines'}
+                      ? 'Confidential Helpline Support Surfaced (Rule §3.4a Active)' 
+                      : 'Immediate 24/7 Crisis Support Lines'}
                   </span>
                 </div>
 
-                <p style={{ fontSize: '0.86rem', color: '#d4d4d8', lineHeight: '1.5', margin: 0 }}>
+                <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.5', margin: 0 }}>
                   {activeSafeguard === 'abuse_bypass' 
-                    ? 'Your safety and privacy come first. Your emergency contacts are NOT contacted. You can reach out to dedicated youth protection helplines 24/7:' 
-                    : 'You do not have to go through this alone. Professional counselors are available 24/7 to listen and support you:'}
+                    ? 'Your physical safety comes first. Personal emergency contacts have been BYPASSED completely. You can speak confidentially with dedicated youth support officers right now:' 
+                    : 'You do not have to carry this alone. Free, confidential professional counselors are available 24/7:'}
                 </p>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' }}>
                   {activeHelplines.map((helpline, i) => (
                     <a
                       key={i}
@@ -673,26 +642,35 @@ export default function Chat({ userSession, onLogout }) {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        padding: '12px 16px',
-                        background: 'rgba(0, 0, 0, 0.3)',
-                        border: '1px solid rgba(239, 68, 68, 0.2)',
-                        borderRadius: '10px',
-                        color: '#f4f4f5',
+                        padding: '14px 18px',
+                        background: 'rgba(7, 2, 4, 0.7)',
+                        border: '1px solid var(--border-glow)',
+                        borderRadius: '12px',
+                        color: 'var(--text-primary)',
                         textDecoration: 'none',
-                        transition: 'background 0.2s ease'
+                        transition: 'all 0.2s ease'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.12)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.3)'}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 30, 86, 0.15)';
+                        e.currentTarget.style.borderColor = 'var(--accent-pink)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(7, 2, 4, 0.7)';
+                        e.currentTarget.style.borderColor = 'var(--border-glow)';
+                      }}
                     >
                       <div>
-                        <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#fca5a5' }}>
-                          {helpline.name} ({helpline.number})
+                        <div style={{ fontWeight: '800', fontSize: '0.94rem', color: 'var(--accent-rose)' }}>
+                          {helpline.name}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginTop: '2px' }}>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '3px' }}>
                           {helpline.desc}
                         </div>
                       </div>
-                      <PhoneCall size={16} style={{ color: '#f87171', flexShrink: 0 }} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-crimson)', fontWeight: '700', fontSize: '0.9rem' }}>
+                        <PhoneCall size={16} />
+                        <span>{helpline.number}</span>
+                      </div>
                     </a>
                   ))}
                 </div>
@@ -705,26 +683,26 @@ export default function Chat({ userSession, onLogout }) {
 
         </div>
 
-        {/* Bottom Floating Input Bar (ChatGPT Style) */}
+        {/* Bottom Floating Input Bar (Hyperlane style) */}
         <div style={{
-          padding: '16px 20px 24px',
+          padding: '14px 20px 20px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          background: 'linear-gradient(to top, #09090b 80%, transparent)'
+          background: 'linear-gradient(to top, var(--bg-primary) 85%, transparent)'
         }}>
           
           <div style={{
             width: '100%',
             maxWidth: '768px',
             position: 'relative',
-            background: '#18181b',
-            border: '1px solid rgba(255, 255, 255, 0.14)',
-            borderRadius: '24px',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border-medium)',
+            borderRadius: 'var(--radius-pill)',
+            boxShadow: '0 4px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(244, 114, 182, 0.08)',
             display: 'flex',
             alignItems: 'center',
-            padding: '6px 10px 6px 18px',
+            padding: '6px 8px 6px 20px',
             transition: 'border-color 0.2s ease'
           }}>
             <input
@@ -740,7 +718,7 @@ export default function Chat({ userSession, onLogout }) {
                 background: 'transparent',
                 border: 'none',
                 outline: 'none',
-                color: '#f4f4f5',
+                color: 'var(--text-primary)',
                 fontSize: '0.95rem',
                 padding: '8px 0',
                 fontFamily: 'inherit'
@@ -751,17 +729,18 @@ export default function Chat({ userSession, onLogout }) {
               onClick={() => handleSendMessage()}
               disabled={!inputText.trim() || isLoading}
               style={{
-                width: '36px',
-                height: '36px',
+                width: '38px',
+                height: '38px',
                 borderRadius: '50%',
                 border: 'none',
-                background: inputText.trim() && !isLoading ? '#f4f4f5' : '#27272a',
-                color: inputText.trim() && !isLoading ? '#09090b' : '#71717a',
+                background: inputText.trim() && !isLoading ? 'linear-gradient(135deg, var(--accent-crimson), var(--accent-cherry))' : 'rgba(255, 255, 255, 0.05)',
+                color: inputText.trim() && !isLoading ? '#ffffff' : 'var(--text-muted)',
                 cursor: inputText.trim() && !isLoading ? 'pointer' : 'default',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
+                boxShadow: inputText.trim() && !isLoading ? '0 0 12px rgba(255, 30, 86, 0.4)' : 'none',
                 transition: 'all 0.15s ease'
               }}
             >
@@ -769,13 +748,13 @@ export default function Chat({ userSession, onLogout }) {
             </button>
           </div>
 
-          <p style={{ fontSize: '0.72rem', color: '#52525b', marginTop: '10px', textAlign: 'center' }}>
-            YUVAA Saarthi is an empathetic youth companion. If you are in immediate danger or distress, call <strong>14416</strong> or <strong>1098</strong>.
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+            <span>YUVAA Saarthi is a youth well-being companion. In acute danger, call <strong>14416</strong> or <strong>1098</strong>.</span>
+          </div>
 
         </div>
 
-      </main>
+      </section>
 
     </div>
   );

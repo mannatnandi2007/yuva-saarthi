@@ -215,12 +215,12 @@ export default function Signup({ onComplete, onNavigate }) {
               padding: '9px 14px',
               borderRadius: '9px',
               border: 'none',
-              background: !isLoginMode ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'transparent',
+              background: !isLoginMode ? 'linear-gradient(135deg, var(--accent-blue), var(--accent-sapphire))' : 'transparent',
               color: !isLoginMode ? '#ffffff' : 'var(--text-secondary)',
               fontSize: '0.86rem',
               fontWeight: '600',
               cursor: 'pointer',
-              boxShadow: !isLoginMode ? '0 2px 8px rgba(99, 102, 241, 0.3)' : 'none',
+              boxShadow: !isLoginMode ? '0 2px 8px rgba(59, 130, 246, 0.35)' : 'none',
               transition: 'all 0.2s ease'
             }}
           >
@@ -234,12 +234,12 @@ export default function Signup({ onComplete, onNavigate }) {
               padding: '9px 14px',
               borderRadius: '9px',
               border: 'none',
-              background: isLoginMode ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'transparent',
+              background: isLoginMode ? 'linear-gradient(135deg, var(--accent-blue), var(--accent-sapphire))' : 'transparent',
               color: isLoginMode ? '#ffffff' : 'var(--text-secondary)',
               fontSize: '0.86rem',
               fontWeight: '600',
               cursor: 'pointer',
-              boxShadow: isLoginMode ? '0 2px 8px rgba(99, 102, 241, 0.3)' : 'none',
+              boxShadow: isLoginMode ? '0 2px 8px rgba(59, 130, 246, 0.35)' : 'none',
               transition: 'all 0.2s ease'
             }}
           >
@@ -285,7 +285,7 @@ export default function Signup({ onComplete, onNavigate }) {
                 padding: '0 14px',
                 transition: 'border-color 0.2s'
               }}>
-                <span style={{ color: 'var(--accent-purple)', fontWeight: '700', marginRight: '8px', fontSize: '1rem' }}>@</span>
+                <span style={{ color: 'var(--accent-pink)', fontWeight: '700', marginRight: '8px', fontSize: '1rem' }}>@</span>
                 <input
                   type="text"
                   placeholder="e.g. mannat_n"
@@ -332,7 +332,7 @@ export default function Signup({ onComplete, onNavigate }) {
               flexDirection: 'column',
               gap: '14px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#c084fc', fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-cyan)', fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 <User size={14} />
                 <span>Your Profile</span>
               </div>
@@ -350,7 +350,7 @@ export default function Signup({ onComplete, onNavigate }) {
                   borderRadius: '10px',
                   padding: '0 12px'
                 }}>
-                  <span style={{ color: '#c084fc', fontWeight: '700', marginRight: '6px' }}>@</span>
+                  <span style={{ color: 'var(--accent-cyan)', fontWeight: '700', marginRight: '6px' }}>@</span>
                   <input
                     type="text"
                     placeholder="e.g. mannat_24"
@@ -461,11 +461,12 @@ export default function Signup({ onComplete, onNavigate }) {
                     value={ageBand}
                     onChange={(e) => setAgeBand(e.target.value)}
                     className="input-field"
+                    style={{ backgroundColor: '#0c1429', color: '#f8fafc', cursor: 'pointer' }}
                   >
-                    <option value="under-13">Under 13</option>
-                    <option value="13-15">13 - 15</option>
-                    <option value="16-17">16 - 17</option>
-                    <option value="18-plus">18 - 20</option>
+                    <option value="under-13" style={{ backgroundColor: '#090e21', color: '#f8fafc' }}>Under 13</option>
+                    <option value="13-15" style={{ backgroundColor: '#090e21', color: '#f8fafc' }}>13 - 15</option>
+                    <option value="16-17" style={{ backgroundColor: '#090e21', color: '#f8fafc' }}>16 - 17</option>
+                    <option value="18-plus" style={{ backgroundColor: '#090e21', color: '#f8fafc' }}>18 - 20</option>
                   </select>
                 </div>
               </div>
@@ -578,13 +579,13 @@ export default function Signup({ onComplete, onNavigate }) {
                         value={contact.relationship}
                         onChange={(e) => updateContact(index, 'relationship', e.target.value)}
                         className="input-field"
-                        style={{ fontSize: '0.84rem', padding: '9px 10px' }}
+                        style={{ fontSize: '0.84rem', padding: '9px 10px', backgroundColor: '#0c1429', color: '#f8fafc', cursor: 'pointer' }}
                       >
-                        <option value="Parent">Parent</option>
-                        <option value="Guardian">Guardian</option>
-                        <option value="Sibling">Sibling</option>
-                        <option value="Friend">Friend</option>
-                        <option value="Other">Other</option>
+                        <option value="Parent" style={{ backgroundColor: '#090e21', color: '#f8fafc' }}>Parent</option>
+                        <option value="Guardian" style={{ backgroundColor: '#090e21', color: '#f8fafc' }}>Guardian</option>
+                        <option value="Sibling" style={{ backgroundColor: '#090e21', color: '#f8fafc' }}>Sibling</option>
+                        <option value="Friend" style={{ backgroundColor: '#090e21', color: '#f8fafc' }}>Friend</option>
+                        <option value="Other" style={{ backgroundColor: '#090e21', color: '#f8fafc' }}>Other</option>
                       </select>
 
                       <div style={{

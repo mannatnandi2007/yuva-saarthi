@@ -24,12 +24,15 @@ from app.schemas import (
     SessionCreateResponse,
     SessionListItem,
     MessageHistoryItem,
+    DeleteSessionResponse,
 )
 from app.services.chat_service import (
     create_session,
     list_sessions,
     send_chat_message,
     get_message_history,
+    delete_session,
+    delete_all_sessions,
 )
 
 # Legacy stub imports (kept so old pydantic models still work)
@@ -90,9 +93,73 @@ def get_sessions(
             session_id=str(r["id"]),
             started_at=r["started_at"],
             summary_snapshot=r.get("summary_snapshot"),
+            heading=r.get("heading"),
         )
         for r in rows
     ]
+
+
+@router.delete(
+    "/sessions/{session_id}",
+    response_model=DeleteSessionResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Delete a single chat session and its history",
+)
+def remove_session(
+    session_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """
+    Delete a specific conversation session and all its messages.
+    """
+    delete_session(session_id=session_id, user_id=current_user.user_id)
+    return DeleteSessionResponse(
+        success=True,
+        session_id=session_id,
+        deleted_count=1,
+        message="Session deleted successfully",
+    )
+
+
+@router.delete(
+    "/chat/history/{session_id}",
+    response_model=DeleteSessionResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Delete a single chat session (alias)",
+)
+def remove_chat_history(
+    session_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Alias for deleting a chat session."""
+    delete_session(session_id=session_id, user_id=current_user.user_id)
+    return DeleteSessionResponse(
+        success=True,
+        session_id=session_id,
+        deleted_count=1,
+        message="Session deleted successfully",
+    )
+
+
+@router.delete(
+    "/sessions",
+    response_model=DeleteSessionResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Delete all chat sessions and history for current user",
+)
+def remove_all_sessions(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """
+    Wipe all chat history and sessions for the authenticated user.
+    """
+    count = delete_all_sessions(user_id=current_user.user_id)
+    return DeleteSessionResponse(
+        success=True,
+        session_id=None,
+        deleted_count=count,
+        message=f"Deleted {count} sessions successfully",
+    )
 
 
 # ===========================================================================
@@ -116,9 +183,9 @@ async def chat(
       1. Authenticate user from Bearer token (enforced by dependency).
       2. Validate session belongs to this user (chat_service).
       3. Save user message to messages table (chat_service).
-      4. Get AI response via llm_service abstraction (mock today, LangChain in Phase 3).
+      4. Get AI response via llm_service abstraction.
       5. Save assistant response with risk tier to messages table (chat_service).
-      6. Return clean JSON response.
+      6. Return clean JSON response with heading.
 
     The `user_id` is NEVER read from the request body — always from the token.
     """
@@ -136,6 +203,8 @@ async def chat(
             rationale=result.rationale,
         ),
         action_taken=result.action_taken,
+        heading=result.heading,
+        session_id=payload.session_id,
     )
 
 

@@ -314,5 +314,9 @@ def trigger_sequential_escalation(
         "call_details": primary_call_details,
         "total_attempts": len(attempts_log),
         "attempts": attempts_log,
-        "details": f"Voice call dispatched to priority #{attempts_log[0]['attempt_order']} contact ({attempts_log[0]['relationship']}) via Bland AI."
+        "details": (
+            f"Voice call dispatched to priority #{attempts_log[0]['attempt_order']} contact ({attempts_log[0]['relationship']}) via Bland AI."
+            if attempts_log
+            else "Voice call queued via Bland AI."
+        )
     }

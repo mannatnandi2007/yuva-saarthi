@@ -147,7 +147,13 @@ async def signup(payload: SignUpRequest):
             detail="Username can only contain letters, numbers, underscores, and hyphens."
         )
 
-    # 1. Enforce unique username check in Supabase (primary source of truth)
+    # 1. Enforce unique username check (local cache + Supabase primary store)
+    if clean_username in _SESSION_CACHE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Username '@{payload.username}' is already taken. Please pick another one."
+        )
+
     try:
         existing = supabase.table("users").select("id").eq("username", clean_username).execute()
         if existing.data and len(existing.data) > 0:
@@ -158,12 +164,8 @@ async def signup(payload: SignUpRequest):
     except HTTPException:
         raise
     except Exception:
-        # Supabase offline / local dev — fall back to session cache check
-        if clean_username in _SESSION_CACHE:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Username '@{payload.username}' is already taken. Please pick another one."
-            )
+        # Supabase offline / local dev
+        pass
 
     # 2. Validate emergency contacts
     validate_emergency_contacts(payload.phone, payload.emergency_contacts)

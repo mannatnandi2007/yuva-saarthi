@@ -20,7 +20,7 @@ class DocumentIngestPayload(BaseModel):
     source: str
     title: str
     chunk_text: str
-    embedding: List[float]  # 1536 float values for OpenAI text-embedding-3-small
+    embedding: List[float]  # 384 dimensions for all-MiniLM-L6-v2 or 1536 for OpenAI
 
 
 class RetrievalQuery(BaseModel):
@@ -32,13 +32,12 @@ class RetrievalQuery(BaseModel):
 async def ingest_document(payload: DocumentIngestPayload):
     """
     Ingest a document chunk with its vector embedding into rag_documents table.
-    BUG-002 FIX: Previously returned a fake success without writing to DB.
-    Now inserts into Supabase rag_documents table with pgvector embedding.
+    Inserts into Supabase rag_documents table with pgvector embedding.
     """
     if len(payload.embedding) == 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Embedding vector cannot be empty. Provide a valid 1536-dim embedding."
+            detail="Embedding vector cannot be empty. Provide a valid embedding vector."
         )
 
     try:

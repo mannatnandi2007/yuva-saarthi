@@ -56,6 +56,15 @@ class SessionListItem(BaseModel):
     session_id: str
     started_at: datetime
     summary_snapshot: Optional[str] = None
+    heading: Optional[str] = None
+
+
+class DeleteSessionResponse(BaseModel):
+    """Response for session deletion"""
+    success: bool
+    session_id: Optional[str] = None
+    deleted_count: int = 1
+    message: str
 
 
 # ---------------------------------------------------------------------------
@@ -84,6 +93,8 @@ class ChatResponse(BaseModel):
     reply: str
     risk_classification: RiskClassificationResponse
     action_taken: str  # matches action_taken_type DB enum
+    heading: Optional[str] = None
+    session_id: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------

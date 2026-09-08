@@ -7,7 +7,7 @@ import re
 import logging
 from typing import Optional, Dict
 
-from app.config import settings
+from app.config import settings, is_gemini_available, trip_gemini_cooldown
 from app.supabase_client import supabase
 
 logger = logging.getLogger(__name__)
@@ -49,28 +49,47 @@ def generate_rolling_summary(
         f"Generate updated rolling summary (max 150 words):"
     )
 
-    # 1. Attempt Gemini
+    # 1. Attempt Gemini (if not in quota cooldown)
     gemini_key = settings.gemini_api_key or settings.llm_api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("LLM_API_KEY")
-    if gemini_key and not gemini_key.startswith("your-") and not gemini_key.startswith("placeholder"):
+    if is_gemini_available() and gemini_key and not gemini_key.startswith("your-") and not gemini_key.startswith("placeholder"):
         try:
             import httpx
-            endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-            headers = {"Authorization": f"Bearer {gemini_key}", "Content-Type": "application/json"}
-            payload = {
-                "model": "gemini-1.5-flash",
-                "messages": [
-                    {"role": "system", "content": SUMMARY_SYSTEM_PROMPT},
-                    {"role": "user", "content": turn_context}
-                ],
-                "temperature": 0.2,
-                "max_tokens": 200
-            }
-            resp = httpx.post(endpoint, headers=headers, json=payload, timeout=5.0)
-            if resp.status_code == 200:
-                summary = resp.json()["choices"][0]["message"]["content"]
-                return _truncate_to_word_cap(summary)
+            ACTIVE_MODELS = [
+                "gemini-flash-latest",
+                "gemini-3.8-flash",
+                "gemini-3.1-flash-lite",
+                "gemini-3.1-pro-preview",
+            ]
+            for model_name in ACTIVE_MODELS:
+                endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
+                payload = {
+                    "contents": [{
+                        "parts": [{"text": f"{SUMMARY_SYSTEM_PROMPT}\n\n{turn_context}"}]
+                    }],
+                    "generationConfig": {
+                        "temperature": 0.2,
+                        "maxOutputTokens": 200
+                    }
+                }
+                try:
+                    resp = httpx.post(endpoint, json=payload, timeout=httpx.Timeout(1.8, connect=1.0))
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        summary = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                        return _truncate_to_word_cap(summary)
+                    elif resp.status_code == 429:
+                        logger.warning("Summary Gemini model %s quota reached (HTTP 429). Tripping cooldown and switching directly to Groq Cloud...", model_name)
+                        trip_gemini_cooldown(180.0)
+                        break
+                except Exception as sum_model_err:
+                    logger.warning("Summary Gemini model %s failed: %s", model_name, sum_model_err)
+                    continue
+
+            logger.warning("[FAILOVER] Gemini pool exhausted for summary. Tripping 180s cooldown and redirecting to Groq Cloud...")
+            trip_gemini_cooldown(180.0)
         except Exception as e:
-            logger.warning("Gemini summary generation failed: %s. Trying Groq Cloud...", e)
+            logger.warning("Gemini summary generation failed: %s. Tripping cooldown and switching to Groq Cloud...", e)
+            trip_gemini_cooldown(180.0)
 
     # 2. Attempt Groq Cloud
     groq_key = settings.groq_api_key or os.environ.get("GROQ_API_KEY")
@@ -80,7 +99,7 @@ def generate_rolling_summary(
             endpoint = "https://api.groq.com/openai/v1/chat/completions"
             headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
             payload = {
-                "model": "llama-3.3-70b-versatile",
+                "model": "qwen/qwen3.8-27b",
                 "messages": [
                     {"role": "system", "content": SUMMARY_SYSTEM_PROMPT},
                     {"role": "user", "content": turn_context}

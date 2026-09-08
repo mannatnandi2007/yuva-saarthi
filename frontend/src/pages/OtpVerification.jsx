@@ -41,7 +41,7 @@ export default function OtpVerification({ userSession, onVerify, onNavigate }) {
     <div style={{ maxWidth: '480px', margin: '40px auto', padding: '20px' }} className="animate-slideup">
       <div className="glass-container" style={{ padding: '40px', textAlign: 'center' }}>
         
-        <KeyRound size={48} color="var(--accent-purple)" style={{ marginBottom: '16px' }} />
+        <KeyRound size={48} color="var(--accent-crimson)" style={{ marginBottom: '16px', filter: 'drop-shadow(0 0 16px rgba(255, 30, 86, 0.45))' }} />
         
         <h1 style={{ fontSize: '1.8rem', marginBottom: '8px' }}>Verify Your Phone</h1>
         <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>

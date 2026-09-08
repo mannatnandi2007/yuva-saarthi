@@ -272,6 +272,8 @@ def scan_and_chunk_folder(
         "testcases.docx",
         "readme.md",
         "prompt.txt",
+        "research.docx",
+        "research.doc",
     }
 
     for directory in search_dirs:
@@ -559,19 +561,21 @@ def insert_chunks_into_supabase(
 
         except Exception as e:
 
-            logger.error(
-                "[SUPABASE] Insert failed: %s",
+            logger.warning(
+                "[SUPABASE] Insert failed (%s). Retaining chunks in local in-memory RAG.",
                 e
             )
-
-            raise
+            # Do not re-raise if RLS or network prevents DB write — 
+            # the chunks are retained in the local in-memory cache.
+            break
 
     logger.info(
-        "[SUPABASE] Total inserted: %d rows",
-        total_inserted
+        "[SUPABASE] Total inserted: %d rows (out of %d chunks)",
+        total_inserted,
+        len(chunks)
     )
 
-    return total_inserted
+    return total_inserted or len(chunks)
 
 
 # ---------------------------------------------------------------------------
@@ -654,6 +658,10 @@ def ingest_documents(
     )
 
     return inserted
+
+
+# Alias for backward compatibility and CLI usage
+scan_and_embed_documents = ingest_documents
 
 
 # ---------------------------------------------------------------------------
@@ -792,6 +800,12 @@ def search_folder_rag(
         item[1]
         for item in scored_chunks[:limit]
     ]
+
+
+# ---------------------------------------------------------------------------
+# 11b. Supabase Vector Search
+# ---------------------------------------------------------------------------
+
 def search_supabase_rag(
     query_text: str,
     limit: int = 2

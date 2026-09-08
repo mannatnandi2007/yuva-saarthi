@@ -6,7 +6,7 @@ import logging
 from typing import Optional
 from pydantic import BaseModel, Field
 
-from app.config import settings
+from app.config import settings, is_gemini_available, trip_gemini_cooldown
 from app.services.pre_filter import check_message_tripwire
 
 logger = logging.getLogger(__name__)
@@ -59,51 +59,64 @@ class RiskClassificationSchema(BaseModel):
     )
 
 
-CRISIS_DETECTION_SYSTEM_PROMPT = """You are the crisis detection system for the YUVAA Saarthi youth well-being companion.
-Your task is to analyze the user's message (along with any prior context) and classify the level of safety risk.
+CRISIS_DETECTION_SYSTEM_PROMPT = """You are the clinical safety and risk classification system for YUVAA Saarthi, an Indian youth mental well-being companion.
+Your job is to deeply understand the user's intent, emotional state, context, and nuance. You understand English, Hindi, and colloquial Hinglish (Hindi in Latin alphabet).
+
+CRITICAL CONTEXTUAL & CULTURAL UNDERSTANDING (Meaning changes person-to-person):
+1. Colloquial Exaggeration / Hyperbole vs Real Crisis:
+   Indian youth frequently use dramatic figures of speech that DO NOT indicate actual self-harm or suicide.
+   - "yaar maths ka paper dekh ke mar jaunga" -> Academic stress / hyperbole. Severity: low or medium (category: distress), NOT self-harm!
+   - "itni garmi hai mar jaunga", "bore ho ke mar jaunga" -> Casual hyperbole. Severity: none or low, NOT self-harm!
+   - "mummy daant ke maar daalengi" -> Common colloquial expression for strict parents. Severity: low/medium distress, NOT domestic abuse!
+   - "giving up on this assignment / code" -> Task frustration, NOT self-harm!
+2. Genuine Crisis (High Severity):
+   - Explicit intent, desire, or plan to end their life, commit suicide, self-injure, or ongoing domestic violence / severe abuse.
+   - "suicide kr rha hu bro", "i feel like suiciding", "zindagi khatam karne ja raha hoon", "nobody would care if i died, i have pills".
+   - Severity: high, category: self_harm or abuse.
 
 Severity levels:
-- none (normal conversational queries, everyday feelings, non-crisis)
-- low (mild stress, daily venting, relationship confusion)
-- medium (moderate sadness, anxiety, persistent distress, feeling overwhelmed)
-- high (active self-harm ideation, suicide threats, ongoing abuse, domestic violence)
+- none: everyday chat, casual thoughts, neutral topics.
+- low: mild sadness, daily venting, relationship confusion, exam stress.
+- medium: persistent anxiety, feelings of worthlessness, feeling deeply overwhelmed or hopeless without active suicidal intent.
+- high: active suicidal ideation, intent to self-harm, suicide threats, active domestic violence or sexual abuse.
 
 Categories:
-- self_harm (suicidal thoughts, wanting to die, self-injury, cutting)
-- abuse (physical abuse, domestic violence, caregiver beating, sexual assault, harassment)
-- distress (anxiety, grief, exam pressure, loneliness, general sadness)
-- none (no concerning symptoms detected)
-
-Understand messages written in:
-- English
-- Hindi
-- Hinglish (Hindi written in Roman English letters, e.g., 'mumma bohot marte hai', 'marna chahta hoon')
+- self_harm: suicidal thoughts, wanting to die, self-injury, cutting.
+- abuse: domestic violence, caregiver beating, sexual assault, harassment.
+- distress: anxiety, grief, academic pressure, loneliness, general sadness.
+- none: no safety concern.
 
 Return ONLY valid JSON matching this schema:
 {
   "severity": "none|low|medium|high",
   "category": "self_harm|abuse|distress|none",
-  "rationale": "Brief clinical/safety justification for the classification."
-}
-
-Do not give advice. Do not converse. Only return the JSON object."""
+  "rationale": "Clinical rationale explaining why this is or isn't a crisis, accounting for colloquial hyperbole vs genuine intent."
+}"""
 
 
 def classify_message_risk(message: str, rolling_summary: Optional[str] = None) -> RiskClassificationSchema:
     """
-    LLM structured classification call (PRD §3.3 & §8).
-    Analyzes user text and rolling conversation history.
+    Semantic risk classification (PRD §3.3 & §8).
     
-    Architecture:
-      1. High-speed tripwire screening (pre_filter.py): Instant deterministic capture of
-         English and Hinglish high-risk phrases (self-harm and caregiver abuse).
-      2. If LLM_API_KEY is configured: Calls LLM structured chain for nuanced classification.
-      3. Guaranteed JSON validation via Pydantic RiskClassificationSchema.
+    1. Primary: LLM semantic evaluation (Gemini 2.5 Flash / Groq) that understands
+       context, tone, colloquial idioms ('mar jaunga exam mein' vs genuine suicide),
+       and person-to-person nuance.
+    2. Fallback: Tripwire heuristics used ONLY when LLM services are offline.
     """
     text_clean = message.strip()
     text_lower = text_clean.lower()
 
-    # Step 1: Check high-risk keyword tripwire (English + Hinglish)
+    # Step 1: PRIMARY — Call LLM classifier for semantic understanding of context & intent
+    llm_result = _call_llm_classifier(text_clean, rolling_summary)
+    if llm_result:
+        logger.info(
+            "[SEMANTIC CLASSIFIER] Message: '%s' -> Severity: %s, Category: %s (Rationale: %s)",
+            text_clean[:60], llm_result.severity, llm_result.category, llm_result.rationale[:80]
+        )
+        return llm_result
+
+    # Step 2: FALLBACK — Tripwire evaluation ONLY if LLM is completely offline
+    logger.warning("[FALLBACK CLASSIFIER] LLM offline; falling back to heuristic tripwire evaluation.")
     triggered, matched_words, detected_lang = check_message_tripwire(text_clean)
     matched_words_lower = [w.lower() for w in matched_words]
 
@@ -119,13 +132,13 @@ def classify_message_risk(message: str, rolling_summary: Optional[str] = None) -
             "khud ko cut", "marna chahta", "marna chahti", "mar jaunga", "mar jaungi",
             "zindagi khatam", "zehar kha", "dard bardasht nahi", "gayab ho jaaoon",
             "sab khatam karne", "mar bhi jaaoon", "kabhi na uthoon", "jeena deserve",
-            "khud ko punish", "bleed karke", "skin burn", "marna", "jaan de"
+            "khud ko punish", "bleed karke", "skin burn", "marna", "jaan de", "suicid"
         ]
-        if any(any(k in w for k in self_harm_terms) for w in matched_words_lower) or any(k in text_lower for k in ["suicide", "kill myself", "marna chahta", "jaan de"]):
+        if any(any(k in w for k in self_harm_terms) for w in matched_words_lower) or any(k in text_lower for k in ["suicid", "kill myself", "marna chahta", "jaan de", "mar rha hu", "mar raha hu"]):
             return RiskClassificationSchema(
                 severity="high",
                 category="self_harm",
-                rationale=f"Tripwire detected self-harm indicators in {detected_lang}: {matched_words}"
+                rationale=f"Offline tripwire detected self-harm indicators in {detected_lang}: {matched_words}"
             )
 
         # Check high-severity abuse tripwires (triggers Rule §3.4a bypass)
@@ -181,28 +194,7 @@ def classify_message_risk(message: str, rolling_summary: Optional[str] = None) -
             rationale=f"Tripwire detected distress signals in {detected_lang}: {matched_words}"
         )
 
-    # Step 2: Multi-provider LLM classification (Gemini with auto-failover to Groq Cloud)
-    llm_result = _call_llm_classifier(text_clean, rolling_summary)
-    if llm_result:
-        # PHASE 5: Validate LLM result — prevent over-classification on benign phrases
-        if llm_result.severity == "high" and llm_result.category != "abuse":
-            # Require at least one high-risk term to be present for LLM-driven HIGH
-            high_risk_anchor_terms = [
-                "suicide", "kill myself", "want to die", "hurt myself", "end my life",
-                "end it all", "overdose", "jaan de", "marna chahta", "mar jaunga",
-                "zindagi khatam", "zehar kha"
-            ]
-            has_anchor = any(term in text_lower for term in high_risk_anchor_terms)
-            if not has_anchor:
-                logger.debug("[FP GUARD] LLM returned HIGH but no anchor term found — downgrading to medium.")
-                llm_result = RiskClassificationSchema(
-                    severity="medium",
-                    category=llm_result.category,
-                    rationale=llm_result.rationale + " (Threshold guard: no explicit high-risk anchor term found.)"
-                )
-        return llm_result
-
-    # Step 3: Heuristic evaluation for mild/low distress indicators
+    # Step 3: Heuristic evaluation for mild/low distress indicators (offline fallback)
     # PHASE 5: Tightened list — only include terms with strong emotional signal
     mild_distress_words = [
         "sad", "crying", "anxious", "stressed", "lonely",
@@ -237,34 +229,58 @@ def _call_llm_classifier(message: str, rolling_summary: Optional[str] = None) ->
     if rolling_summary:
         user_prompt += f"Prior Context Summary: {rolling_summary}\n"
 
-    # --- 1. Attempt Primary: Gemini ---
+    # --- 1. Attempt Primary: Gemini (if not in quota cooldown) ---
     gemini_key = settings.gemini_api_key or settings.llm_api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("LLM_API_KEY")
-    if gemini_key and not gemini_key.startswith("your-") and not gemini_key.startswith("placeholder"):
+    if is_gemini_available() and gemini_key and not gemini_key.startswith("your-") and not gemini_key.startswith("placeholder"):
         try:
-            endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-            headers = {"Authorization": f"Bearer {gemini_key}", "Content-Type": "application/json"}
-            payload = {
-                "model": "gemini-1.5-flash",
-                "messages": [
-                    {"role": "system", "content": CRISIS_DETECTION_SYSTEM_PROMPT},
-                    {"role": "user", "content": user_prompt}
-                ],
-                "response_format": {"type": "json_object"},
-                "temperature": 0.1
-            }
-            resp = httpx.post(endpoint, headers=headers, json=payload, timeout=5.0)
-            if resp.status_code == 200:
-                content = resp.json()["choices"][0]["message"]["content"]
-                parsed = json.loads(content)
-                return RiskClassificationSchema(
-                    severity=parsed.get("severity", "none").lower(),
-                    category=parsed.get("category", "none").lower(),
-                    rationale=parsed.get("rationale", "Classified by safety model.")
-                )
-            else:
-                logger.warning("Primary LLM (Gemini) returned status %d. Attempting auto-failover to Groq Cloud...", resp.status_code)
+            full_prompt = f"{CRISIS_DETECTION_SYSTEM_PROMPT}\n\n{user_prompt}"
+            ACTIVE_MODELS = [
+                "gemini-flash-latest",
+                "gemini-3.8-flash",
+                "gemini-3.1-flash-lite",
+                "gemini-3.1-pro-preview",
+            ]
+            for model in ACTIVE_MODELS:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={gemini_key}"
+                payload = {
+                    "contents": [{"role": "user", "parts": [{"text": full_prompt}]}],
+                    "generationConfig": {"responseMimeType": "application/json", "temperature": 0.1}
+                }
+                try:
+                    resp = httpx.post(url, json=payload, timeout=httpx.Timeout(1.8, connect=1.0))
+                    if resp.status_code == 200:
+                        candidates = resp.json().get("candidates", [])
+                        if candidates and "content" in candidates[0]:
+                            parts = candidates[0]["content"].get("parts", [])
+                            if parts and "text" in parts[0]:
+                                parsed = json.loads(parts[0]["text"])
+                                sev = parsed.get("severity", "none").lower()
+                                cat = parsed.get("category", "none").lower()
+                                # Normalize category if LLM returns a variant
+                                if "suicid" in cat or "self" in cat or "harm" in cat:
+                                    cat = "self_harm"
+                                elif "abuse" in cat or "violen" in cat:
+                                    cat = "abuse"
+                                elif "distress" in cat or "mental" in cat or "crisis" in cat:
+                                    cat = "distress"
+                                return RiskClassificationSchema(
+                                    severity=sev,
+                                    category=cat,
+                                    rationale=parsed.get("rationale", "Classified by safety model.")
+                                )
+                    elif resp.status_code == 429:
+                        logger.warning("Classifier Gemini model %s quota reached (HTTP 429). Tripping cooldown and switching directly to Groq Cloud...", model)
+                        trip_gemini_cooldown(180.0)
+                        break
+                except Exception as model_err:
+                    logger.warning("Classifier Gemini model %s failed: %s", model, model_err)
+                    continue
+
+            logger.warning("[FAILOVER] Gemini pool exhausted for classifier. Tripping 180s cooldown and redirecting to Groq Cloud...")
+            trip_gemini_cooldown(180.0)
         except Exception as ex:
-            logger.warning("Primary LLM (Gemini) failed (%s). Attempting auto-failover to Groq Cloud...", ex)
+            logger.warning("Primary LLM (Gemini) failed (%s). Tripping cooldown and switching to Groq Cloud...", ex)
+            trip_gemini_cooldown(180.0)
 
     # --- 2. Attempt Fallback: Groq Cloud ---
     groq_key = settings.groq_api_key or os.environ.get("GROQ_API_KEY")
@@ -273,7 +289,7 @@ def _call_llm_classifier(message: str, rolling_summary: Optional[str] = None) ->
             endpoint = "https://api.groq.com/openai/v1/chat/completions"
             headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
             payload = {
-                "model": "llama-3.3-70b-versatile",
+                "model": "qwen/qwen3.8-27b",
                 "messages": [
                     {"role": "system", "content": CRISIS_DETECTION_SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt}

@@ -39,3 +39,21 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+# ---------------------------------------------------------------------------
+# Dynamic Circuit Breaker for Gemini Quota Management
+# If Gemini returns HTTP 429, auto-failover to Groq Cloud immediately
+# ---------------------------------------------------------------------------
+import time
+
+_GEMINI_COOLDOWN_UNTIL = 0.0
+
+def is_gemini_available() -> bool:
+    """Returns False if Gemini recently hit HTTP 429 quota limit and is cooling down."""
+    global _GEMINI_COOLDOWN_UNTIL
+    return time.time() > _GEMINI_COOLDOWN_UNTIL
+
+def trip_gemini_cooldown(seconds: float = 60.0) -> None:
+    """Trips cooldown timer so all subsequent calls route directly to Groq Cloud."""
+    global _GEMINI_COOLDOWN_UNTIL
+    _GEMINI_COOLDOWN_UNTIL = time.time() + seconds
+
