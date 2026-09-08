@@ -792,7 +792,56 @@ def search_folder_rag(
         item[1]
         for item in scored_chunks[:limit]
     ]
+def search_supabase_rag(
+    query_text: str,
+    limit: int = 2
+) -> List[Dict[str, Any]]:
+    """
+    Search Supabase rag_documents using pgvector similarity.
+    """
 
+    if not query_text:
+        return []
+
+    model = _get_minilm_model()
+
+    if model is None:
+        logger.warning("[SUPABASE RAG] MiniLM model unavailable.")
+        return []
+
+    try:
+        # Generate 384-dimensional query embedding
+        query_embedding = model.encode(
+            [query_text],
+            convert_to_numpy=True,
+            normalize_embeddings=True
+        )[0]
+
+        # Call Supabase pgvector RPC function
+        response = supabase.rpc(
+            "match_rag_documents",
+            {
+                "query_embedding": query_embedding.tolist(),
+                "match_count": limit
+            }
+        ).execute()
+
+        results = response.data or []
+
+        logger.info(
+            "[SUPABASE RAG] Retrieved %d chunks for query: '%s...'",
+            len(results),
+            query_text[:30]
+        )
+
+        return results
+
+    except Exception as e:
+        logger.error(
+            "[SUPABASE RAG] Vector search failed: %s",
+            e
+        )
+        return []
 
 # ---------------------------------------------------------------------------
 # 12. Refresh Local Cache
