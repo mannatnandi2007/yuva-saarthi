@@ -13,6 +13,43 @@ This file tracks the project building progress across a 5-phase execution schedu
 | **Phase 3: Risk Engine & Escalation**<br>*(Aug 17 - Aug 18)* | [x] LLM risk classification (JSON output)<br>[x] Bland AI pathway setup<br>[x] Call escalation logic (Bland AI loop)<br>[x] Short-circuit check for abuse | [ ] Call escalation logic (reassigned to Mannat)<br>[ ] Short-circuit check (reassigned to Mannat) | [x] `risk_events` & `alert_attempts` logs<br>[x] Add `routed_to_helpline` enum | [ ] Keyword/regex pre-filter stub<br>[ ] Policy disclosure UI |
 | **Phase 4: RAG & Context**<br>*(Aug 19)* | [x] Rolling summary generator (LLM)<br>[x] Wire RAG context into prompt | [ ] Cross-login context APIs<br>[x] Support retrieval APIs | [ ] Ingest WHO/NIMHANS/ICMR vectors<br>[x] DB indexes review | [ ] Create test conversation sets<br>[ ] Abuse-routing disclosure copy |
 | **Phase 5: Testing & Prototype Wrap**<br>*(Aug 20)* | [x] Tune false positive thresholds<br>[x] Demo script integration<br>[x] End-to-end flow test suite | [x] Fix backend bugs<br>[x] Prototype local execution | [x] Fix DB schema issues<br>[x] Database migration ready | [ ] Run tests & flag errors<br>[x] Prototype local execution |
+| **Phase 6: Resilience, Deletion & UI**<br>*(Aug 21 - Present)* | [ ] LLM failover chain (Gemini → Groq → Fallback)<br>[ ] Quota circuit breaker tuning<br>[ ] Failover latency & retry logic | [ ] Multi-session batch deletion API<br>[ ] Cascade session delete endpoint<br>[ ] In-memory session cache invalidation | [ ] Cascading delete foreign keys<br>[ ] DB cleanup transaction scripts<br>[ ] Session query performance checks | [ ] Hallmark UI overhaul & styling<br>[ ] Multi-session selection UI & bulk delete<br>[ ] Confirmation dialogs & tactile feedback |
+
+---
+
+## Active Tasks Under Implementation
+
+### 1. Multi-Session Deletion
+- [ ] **Frontend (Yashika / UI)**:
+  - Add multi-selection mode (checkboxes / select all) to the chat session sidebar.
+  - Implement bulk action bar with "Delete Selected" and "Select All" actions.
+  - Add animated confirmation modal with warning before irreversible batch deletion.
+  - Update session store state optimistically on successful batch deletion.
+- [ ] **Backend (Khushal / API)**:
+  - Implement `DELETE /chat/sessions/bulk` or `POST /chat/sessions/batch-delete` accepting a list of `session_ids`.
+  - Validate session ownership for every ID against the authenticated user.
+  - Invalidate in-memory summaries cache (`_IN_MEMORY_SUMMARIES`) for all deleted sessions.
+- [ ] **Database (Aakansha / SQL)**:
+  - Verify `ON DELETE CASCADE` constraints across `messages` and `sessions` tables.
+  - Add batch transaction safety to prevent partial deletion states.
+
+### 2. LLM Failover & Resilience
+- [ ] **LLM Pipeline (Mannat / Lead)**:
+  - Multi-provider fallback chain: Primary (Gemini 2.5 Flash) → Secondary (Groq Llama 3 / Mixtral) → Fallback.
+  - Quota circuit breaker (`trip_gemini_cooldown`) with automated cooldown recovery timer.
+  - Timeout and retry interceptor for graceful degradation during high network latency or API rate limits.
+  - Structured output validation during failover to ensure risk classification schema remains intact.
+- [ ] **Backend (Khushal / API)**:
+  - Log active model provider telemetry per request for monitoring and debugging.
+  - Health check endpoint (`/health/llm`) reporting status of primary and secondary LLM providers.
+
+### 3. Hallmark UI Polish & Design System
+- [ ] **Frontend & Design System (Yashika / UI)**:
+  - Apply Hallmark anti-AI-slop design guidelines across all views: Chat, Contacts, Policies, and Auth.
+  - Implement cohesive dark glassmorphism design tokens (curated blur, border gradients, deep elevation).
+  - Modern typography hierarchy with custom Google Fonts (Outfit / Inter) instead of generic browser defaults.
+  - Subtle micro-interactions: smooth sidebar slide transitions, typing indicator bounce, tactile button states.
+  - Responsive layout polish for mobile/tablet screens with comfortable touch targets.
 
 ---
 
@@ -21,3 +58,5 @@ This file tracks the project building progress across a 5-phase execution schedu
 2. **Start of Phase 3**: `risk_events` and `alert_attempts` logging tables must exist before the escalation logic is written.
 3. **Mid Phase 3 (Highest Coordination)**: Sync on data models passed between LLM classifier, Khushal's state machine, and Mannat's Bland AI trigger. Ensure the `category == abuse` check intercepts the escalation path before anyone is dialed.
 4. **End of Phase 4**: Yashika locks down the test set (English + Hinglish + abuse cases) before final testing on August 20th begins.
+5. **Phase 6 Sync**: Coordinate LLM failover fallback models with risk classifier schemas, and verify batch session deletion cleanly purges frontend state and backend RAG/summary caches simultaneously.
+

@@ -496,6 +496,17 @@ generate_rolling_summary(existing_summary, user_message, assistant_reply)
 
 ## 11. Pending Features & Incomplete Tasks
 
+### Active Focus Sprint — In Progress (Phase 6)
+
+- **Multi-Session Deletion**:
+  - UI multi-selection mode in sidebar (checkboxes, "Select All", animated confirmation modal).
+  - Backend batch deletion endpoint (`DELETE /chat/sessions/bulk` or `POST /chat/sessions/batch-delete`), cascading database cleanup of messages and sessions, and RAG/summary cache purge.
+- **LLM Multi-Provider Failover & Resilience**:
+  - Robust multi-tier provider fallback chain: Gemini 2.5 Flash → Groq Llama 3 / Mixtral → Fallback.
+  - Quota circuit breaker (`trip_gemini_cooldown`), automated cooldown recovery timer, and failover latency retry logic.
+- **Hallmark UI Improvements**:
+  - Cohesive anti-AI-slop design system rollout with dark glassmorphism tokens, refined typography (Outfit / Inter), tactile touch targets, smooth sidebar transitions, and accessibility polish.
+
 ### High Priority — Production Blockers
 
 1. **Row-Level Security (RLS)** — All 7 tables have RLS disabled. RLS policies must be written before any user-facing deployment.
