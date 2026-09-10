@@ -84,49 +84,92 @@ GROUNDED_KNOWLEDGE_BASE: List[Dict[str, Any]] = [
 
 def retrieve_relevant_guidelines(query_text: str, limit: int = 2) -> List[Dict[str, Any]]:
     """
-    Retrieve nearest guideline chunks based on user text keywords and clinical intent.
-    Prioritizes curated evidence-based clinical protocols (WHO / NIMHANS / ICMR)
-    for high-signal queries, and integrates local folder RAG and Supabase pgvector search.
-    Supports English, Hindi, and Hinglish queries with ultra-low latency (<2ms).
+    Retrieve relevant guideline chunks using local document RAG,
+    Supabase pgvector search, and the curated knowledge base as fallback.
+    Supports English, Hindi, and Hinglish queries.
     """
     if not query_text:
         return GROUNDED_KNOWLEDGE_BASE[:limit]
 
+    # --- Priority 1: Search local document files using MiniLM ---
+    try:
+        from app.services.folder_rag_service import search_folder_rag
+        folder_matches = search_folder_rag(query_text, limit=limit)
+
+        if folder_matches:
+            for m in folder_matches:
+                if "guideline" not in m and "chunk_text" in m:
+                    m["guideline"] = m["chunk_text"]
+
+            logger.debug(
+                "Retrieved %d chunks from local document folder for query '%s...'",
+                len(folder_matches),
+                query_text[:30]
+            )
+            return folder_matches
+
+    except Exception as e:
+        logger.debug("Folder RAG search skipped: %s", e)
+
+    # --- Priority 2: Search Supabase using pgvector ---
+    try:
+        from app.services.folder_rag_service import search_supabase_rag
+
+        db_results = search_supabase_rag(query_text, limit=limit)
+
+        if db_results:
+            for row in db_results:
+                if "guideline" not in row and "chunk_text" in row:
+                    row["guideline"] = row["chunk_text"]
+
+            logger.debug(
+                "Retrieved %d chunks from Supabase pgvector for query '%s...'",
+                len(db_results),
+                query_text[:30]
+            )
+            return db_results
+
+    except Exception as e:
+        logger.debug(
+            "Supabase pgvector retrieval failed (%s); using in-memory KB.",
+            e
+        )
+
+    # --- Priority 3: Curated in-memory knowledge base ---
     query_lower = query_text.lower()
     query_tokens = set(re.findall(r"\b\w+\b", query_lower))
 
-    # --- Priority 1: Check curated evidence-based clinical knowledge base ---
     scored_entries = []
+
     for item in GROUNDED_KNOWLEDGE_BASE:
         score = 0.0
-        # Keyword matches
+
         for kw in item["keywords"]:
             if kw in query_lower:
                 score += 2.0
             elif kw in query_tokens:
                 score += 1.5
 
-        # Title/source matches
         if any(token in item["title"].lower() for token in query_tokens):
             score += 1.0
 
         if score > 0:
             scored_entries.append((score, item))
 
-    # Sort descending by relevance score
     scored_entries.sort(key=lambda x: x[0], reverse=True)
 
-    # Return top matches immediately
     if scored_entries:
         results = [entry[1] for entry in scored_entries[:limit]]
-        logger.debug("Retrieved %d clinical guidelines for query: '%s...'", len(results), query_text[:30])
-        return results
+    else:
+        results = [GROUNDED_KNOWLEDGE_BASE[1], GROUNDED_KNOWLEDGE_BASE[4]][:limit]
 
-    # Fallback to general emotional regulation guidelines
-    results = [GROUNDED_KNOWLEDGE_BASE[1], GROUNDED_KNOWLEDGE_BASE[2]][:limit]
-    logger.debug("Retrieved %d fallback RAG chunks for query: '%s...'", len(results), query_text[:30])
+    logger.debug(
+        "Retrieved %d RAG in-memory chunks for query: '%s...'",
+        len(results),
+        query_text[:30]
+    )
+
     return results
-
 
 
 def build_rag_prompt_context(query_text: str) -> str:
