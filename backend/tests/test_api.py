@@ -1009,3 +1009,459 @@ class TestPhase4SupportRetrievalAPIs:
         # Verify cache was actually invalidated before re-indexing
         mock_refresh.assert_called_once()
         mock_scan.assert_called_once()
+
+
+# ===========================================================================
+# Phase 6 — DELETE /sessions/{session_id}  (single-delete, previously untested)
+# ===========================================================================
+
+class TestSingleDeleteSession:
+    """
+    Covers the DELETE /sessions/{session_id} endpoint.
+    These scenarios were not previously tested.
+    """
+
+    def _mock_session_owned_by(self, mock_supabase, owner_id):
+        """Wire validate_session_ownership to return a session owned by owner_id."""
+        mock_supabase.table.return_value.select.return_value \
+            .eq.return_value.single.return_value.execute.return_value = fake_single_result({
+                "id": TEST_SESSION_ID,
+                "user_id": owner_id,
+                "summary_snapshot": None,
+            })
+        # delete calls (messages then sessions)
+        mock_supabase.table.return_value.delete.return_value \
+            .eq.return_value.execute.return_value = fake_result([])
+
+    @patch("app.services.chat_service.supabase")
+    def test_single_delete_returns_success(self, mock_supabase):
+        """DELETE /sessions/{id} owned by the authenticated user returns 200."""
+        self._mock_session_owned_by(mock_supabase, TEST_USER_ID)
+
+        resp = client.delete(f"/sessions/{TEST_SESSION_ID}", headers=DEV_AUTH)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is True
+        assert body["deleted_count"] == 1
+        assert body["session_id"] == TEST_SESSION_ID
+
+    @patch("app.services.chat_service.supabase")
+    def test_single_delete_rejects_other_users_session(self, mock_supabase):
+        """DELETE /sessions/{id} for a session owned by another user returns 403."""
+        self._mock_session_owned_by(mock_supabase, TEST_OTHER_USER_ID)
+
+        resp = client.delete(f"/sessions/{TEST_SESSION_ID}", headers=DEV_AUTH)
+        assert resp.status_code == 403
+
+    @patch("app.services.chat_service.supabase")
+    def test_single_delete_returns_404_for_nonexistent_session(self, mock_supabase):
+        """DELETE /sessions/{id} for a session that doesn't exist returns 404."""
+        mock_supabase.table.return_value.select.return_value \
+            .eq.return_value.single.return_value.execute.side_effect = Exception("No rows found")
+
+        resp = client.delete(f"/sessions/{uuid.uuid4()}", headers=DEV_AUTH)
+        assert resp.status_code == 404
+
+    def test_single_delete_requires_auth(self):
+        """DELETE /sessions/{id} without auth header returns 401."""
+        resp = client.delete(f"/sessions/{TEST_SESSION_ID}")
+        assert resp.status_code == 401
+
+
+# ===========================================================================
+# Phase 6 — DELETE /sessions  (delete-all, previously untested)
+# ===========================================================================
+
+class TestDeleteAllSessions:
+    """Covers the DELETE /sessions (delete-all) endpoint."""
+
+    @patch("app.services.chat_service.supabase")
+    def test_delete_all_returns_count(self, mock_supabase):
+        """DELETE /sessions wipes all sessions and returns the count."""
+        session_id_2 = str(uuid.uuid4())
+        # Fetch user's session IDs
+        mock_supabase.table.return_value.select.return_value \
+            .eq.return_value.execute.return_value = fake_result([
+                {"id": TEST_SESSION_ID},
+                {"id": session_id_2},
+            ])
+        # Per-session message deletes + final session delete
+        mock_supabase.table.return_value.delete.return_value \
+            .eq.return_value.execute.return_value = fake_result([])
+
+        resp = client.delete("/sessions", headers=DEV_AUTH)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is True
+        assert body["deleted_count"] == 2
+
+    @patch("app.services.chat_service.supabase")
+    def test_delete_all_returns_zero_when_no_sessions(self, mock_supabase):
+        """DELETE /sessions for a user with no sessions returns deleted_count=0."""
+        mock_supabase.table.return_value.select.return_value \
+            .eq.return_value.execute.return_value = fake_result([])
+
+        resp = client.delete("/sessions", headers=DEV_AUTH)
+        assert resp.status_code == 200
+        assert resp.json()["deleted_count"] == 0
+
+    def test_delete_all_requires_auth(self):
+        resp = client.delete("/sessions")
+        assert resp.status_code == 401
+
+
+# ===========================================================================
+# Phase 6 — POST /chat/sessions/batch-delete
+# ===========================================================================
+
+class TestBatchDeleteSessions:
+    """
+    Comprehensive tests for POST /chat/sessions/batch-delete.
+
+    Scenarios:
+      1.  Successful deletion of multiple sessions
+      2.  Empty session_ids list rejected (422)
+      3.  Missing session_ids key rejected (422)
+      4.  Requires authentication (401)
+      5.  Another user's session cannot be deleted (403, no partial deletes)
+      6.  Single nonexistent session returns 404
+      7.  Mix of valid + nonexistent session aborts batch (404, no deletes)
+      8.  Duplicate IDs are deduplicated (only deleted once)
+      9.  Cache invalidated for every deleted session
+      10. Single-item list works (minimum valid batch)
+      11. Batch with local/dev session IDs is silently skipped
+      12. Existing single-delete and delete-all endpoints still work
+          (regression guard)
+    """
+
+    # -----------------------------------------------------------------------
+    # Helpers
+    # -----------------------------------------------------------------------
+
+    SESSION_A = str(uuid.uuid4())
+    SESSION_B = str(uuid.uuid4())
+
+    def _mock_owned_session(self, mock_supabase, session_id, owner_id=None):
+        """
+        Wire validate_session_ownership for a single session lookup so that
+        .single().execute() returns the expected owner.
+
+        Because unittest.mock chains return the SAME mock object for each
+        chained call by default, we wire the final .execute() return value
+        and rely on the mock absorbing the intervening .eq() chain.
+        """
+        owner = owner_id or TEST_USER_ID
+        mock_supabase.table.return_value.select.return_value \
+            .eq.return_value.single.return_value.execute.return_value = fake_single_result({
+                "id": session_id,
+                "user_id": owner,
+                "summary_snapshot": None,
+            })
+        # DB deletes (messages then session)
+        mock_supabase.table.return_value.delete.return_value \
+            .eq.return_value.execute.return_value = fake_result([])
+
+    # -----------------------------------------------------------------------
+    # Test 1: Successful multi-session deletion
+    # -----------------------------------------------------------------------
+    def test_batch_delete_multiple_sessions(self):
+        """
+        Deleting two owned sessions returns 200 with deleted_count == 2.
+        We patch delete_session() directly to isolate the HTTP layer from
+        the DB layer, since the multi-mock chain for two distinct session IDs
+        cannot be cleanly differentiated via a single MagicMock.
+        """
+        with patch("app.services.chat_service.delete_session") as mock_del, \
+             patch("app.services.chat_service.validate_session_ownership") as mock_val:
+            mock_val.return_value = {"id": self.SESSION_A, "user_id": TEST_USER_ID, "summary_snapshot": None}
+            mock_del.return_value = True
+
+            resp = client.post(
+                "/chat/sessions/batch-delete",
+                json={"session_ids": [self.SESSION_A, self.SESSION_B]},
+                headers=DEV_AUTH,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is True
+        assert body["deleted_count"] == 2
+        assert "batch deleted" in body["message"].lower()
+        assert body["session_id"] is None
+
+    # -----------------------------------------------------------------------
+    # Test 2: Empty session_ids list is rejected (Pydantic min_length=1)
+    # -----------------------------------------------------------------------
+    def test_batch_delete_rejects_empty_list(self):
+        """An empty session_ids list must be rejected with HTTP 422."""
+        resp = client.post(
+            "/chat/sessions/batch-delete",
+            json={"session_ids": []},
+            headers=DEV_AUTH,
+        )
+        assert resp.status_code == 422
+
+    # -----------------------------------------------------------------------
+    # Test 3: Missing session_ids field
+    # -----------------------------------------------------------------------
+    def test_batch_delete_rejects_missing_field(self):
+        """A request body with no session_ids key must be rejected with HTTP 422."""
+        resp = client.post(
+            "/chat/sessions/batch-delete",
+            json={},
+            headers=DEV_AUTH,
+        )
+        assert resp.status_code == 422
+
+    # -----------------------------------------------------------------------
+    # Test 4: Requires authentication
+    # -----------------------------------------------------------------------
+    def test_batch_delete_requires_auth(self):
+        """POST /chat/sessions/batch-delete without an auth header returns 401."""
+        resp = client.post(
+            "/chat/sessions/batch-delete",
+            json={"session_ids": [self.SESSION_A]},
+        )
+        assert resp.status_code == 401
+
+    # -----------------------------------------------------------------------
+    # Test 5: Ownership enforcement — another user's session aborts the batch
+    # -----------------------------------------------------------------------
+    def test_batch_delete_rejects_other_users_session(self):
+        """
+        If any session in the list belongs to another user, the entire batch
+        is aborted and 403 is returned. No sessions must be deleted.
+        """
+        with patch("app.services.chat_service.validate_session_ownership") as mock_val, \
+             patch("app.services.chat_service.delete_session") as mock_del:
+
+            # First session is fine; second is owned by someone else
+            def ownership_side_effect(session_id, user_id):
+                if session_id == self.SESSION_B:
+                    from fastapi import HTTPException, status as st
+                    raise HTTPException(
+                        status_code=st.HTTP_403_FORBIDDEN,
+                        detail="You do not have access to this session.",
+                    )
+                return {"id": session_id, "user_id": user_id, "summary_snapshot": None}
+
+            mock_val.side_effect = ownership_side_effect
+
+            resp = client.post(
+                "/chat/sessions/batch-delete",
+                json={"session_ids": [self.SESSION_A, self.SESSION_B]},
+                headers=DEV_AUTH,
+            )
+
+        assert resp.status_code == 403
+        # Crucially: delete_session() must NOT have been called at all
+        mock_del.assert_not_called()
+
+    # -----------------------------------------------------------------------
+    # Test 6: Nonexistent session returns 404
+    # -----------------------------------------------------------------------
+    def test_batch_delete_returns_404_for_nonexistent_session(self):
+        """
+        A session that does not exist must produce a 404 and abort the batch.
+        """
+        with patch("app.services.chat_service.validate_session_ownership") as mock_val, \
+             patch("app.services.chat_service.delete_session") as mock_del:
+
+            from fastapi import HTTPException, status as st
+            mock_val.side_effect = HTTPException(
+                status_code=st.HTTP_404_NOT_FOUND,
+                detail="Session not found.",
+            )
+
+            resp = client.post(
+                "/chat/sessions/batch-delete",
+                json={"session_ids": [str(uuid.uuid4())]},
+                headers=DEV_AUTH,
+            )
+
+        assert resp.status_code == 404
+        mock_del.assert_not_called()
+
+    # -----------------------------------------------------------------------
+    # Test 7: Mix of valid + nonexistent session aborts entire batch
+    # -----------------------------------------------------------------------
+    def test_batch_delete_aborts_on_first_nonexistent_session(self):
+        """
+        If the batch contains [valid_id, missing_id], the missing_id triggers
+        404 during pre-validation and NO sessions are deleted.
+        """
+        with patch("app.services.chat_service.validate_session_ownership") as mock_val, \
+             patch("app.services.chat_service.delete_session") as mock_del:
+
+            from fastapi import HTTPException, status as st
+
+            def ownership_side_effect(session_id, user_id):
+                if session_id == self.SESSION_B:
+                    raise HTTPException(
+                        status_code=st.HTTP_404_NOT_FOUND,
+                        detail="Session not found.",
+                    )
+                return {"id": session_id, "user_id": user_id, "summary_snapshot": None}
+
+            mock_val.side_effect = ownership_side_effect
+
+            resp = client.post(
+                "/chat/sessions/batch-delete",
+                json={"session_ids": [self.SESSION_A, self.SESSION_B]},
+                headers=DEV_AUTH,
+            )
+
+        assert resp.status_code == 404
+        mock_del.assert_not_called()
+
+    # -----------------------------------------------------------------------
+    # Test 8: Duplicate IDs are deduplicated — delete_session() called once per unique ID
+    # -----------------------------------------------------------------------
+    def test_batch_delete_deduplicates_ids(self):
+        """
+        If the same session ID appears twice in the request, it must only be
+        deleted once. deleted_count must equal the number of unique IDs.
+        """
+        with patch("app.services.chat_service.validate_session_ownership") as mock_val, \
+             patch("app.services.chat_service.delete_session") as mock_del:
+
+            mock_val.return_value = {
+                "id": self.SESSION_A, "user_id": TEST_USER_ID, "summary_snapshot": None
+            }
+            mock_del.return_value = True
+
+            resp = client.post(
+                "/chat/sessions/batch-delete",
+                json={"session_ids": [self.SESSION_A, self.SESSION_A, self.SESSION_A]},
+                headers=DEV_AUTH,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["deleted_count"] == 1           # only 1 unique ID
+        assert mock_del.call_count == 1             # delete_session called exactly once
+        assert mock_val.call_count == 1             # validate called exactly once
+
+    # -----------------------------------------------------------------------
+    # Test 9: Cache (_IN_MEMORY_SUMMARIES) is invalidated for every deleted session
+    # -----------------------------------------------------------------------
+    def test_batch_delete_clears_in_memory_cache(self):
+        """
+        After a successful batch delete, the in-memory summary cache must
+        contain no entries for the deleted session IDs.
+        """
+        from app.services.summary_service import _IN_MEMORY_SUMMARIES
+
+        # Pre-populate the cache for both sessions
+        _IN_MEMORY_SUMMARIES[self.SESSION_A] = "Some prior summary A"
+        _IN_MEMORY_SUMMARIES[self.SESSION_B] = "Some prior summary B"
+
+        with patch("app.services.chat_service.validate_session_ownership") as mock_val, \
+             patch("app.services.chat_service.supabase") as mock_sb:
+
+            mock_val.return_value = {
+                "id": self.SESSION_A, "user_id": TEST_USER_ID, "summary_snapshot": None
+            }
+            # DB deletes succeed silently
+            mock_sb.table.return_value.delete.return_value \
+                .eq.return_value.execute.return_value = fake_result([])
+
+            resp = client.post(
+                "/chat/sessions/batch-delete",
+                json={"session_ids": [self.SESSION_A, self.SESSION_B]},
+                headers=DEV_AUTH,
+            )
+
+        assert resp.status_code == 200
+        # Both cache entries must be gone
+        assert self.SESSION_A not in _IN_MEMORY_SUMMARIES, \
+            f"Cache entry for SESSION_A was not cleared after batch delete"
+        assert self.SESSION_B not in _IN_MEMORY_SUMMARIES, \
+            f"Cache entry for SESSION_B was not cleared after batch delete"
+
+    # -----------------------------------------------------------------------
+    # Test 10: Single-item list (minimum valid batch)
+    # -----------------------------------------------------------------------
+    def test_batch_delete_single_item_list(self):
+        """A list with exactly one session ID is the minimum valid batch."""
+        with patch("app.services.chat_service.validate_session_ownership") as mock_val, \
+             patch("app.services.chat_service.delete_session") as mock_del:
+
+            mock_val.return_value = {
+                "id": self.SESSION_A, "user_id": TEST_USER_ID, "summary_snapshot": None
+            }
+            mock_del.return_value = True
+
+            resp = client.post(
+                "/chat/sessions/batch-delete",
+                json={"session_ids": [self.SESSION_A]},
+                headers=DEV_AUTH,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["deleted_count"] == 1
+
+    # -----------------------------------------------------------------------
+    # Test 11: Local/dev session IDs bypass DB ownership check
+    # -----------------------------------------------------------------------
+    def test_batch_delete_handles_local_session_ids(self):
+        """
+        Transient session IDs (prefixed 'local-') must be handled gracefully.
+        delete_session() already skips DB operations for them; the batch
+        endpoint must not fail on these IDs.
+        """
+        local_id = "local-test-session-1"
+        with patch("app.services.chat_service.supabase") as mock_sb:
+            # No DB calls should occur for local sessions
+            mock_sb.table.return_value.delete.return_value \
+                .eq.return_value.execute.return_value = fake_result([])
+
+            resp = client.post(
+                "/chat/sessions/batch-delete",
+                json={"session_ids": [local_id]},
+                headers=DEV_AUTH,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["deleted_count"] == 1
+
+    # -----------------------------------------------------------------------
+    # Test 12: Regression — existing single-delete and delete-all still work
+    # -----------------------------------------------------------------------
+    @patch("app.services.chat_service.supabase")
+    def test_existing_single_delete_still_works(self, mock_supabase):
+        """
+        Regression guard: DELETE /sessions/{session_id} must be unaffected
+        by the addition of the batch-delete endpoint.
+        """
+        # Session owned by test user
+        mock_supabase.table.return_value.select.return_value \
+            .eq.return_value.single.return_value.execute.return_value = fake_single_result({
+                "id": TEST_SESSION_ID,
+                "user_id": TEST_USER_ID,
+                "summary_snapshot": None,
+            })
+        mock_supabase.table.return_value.delete.return_value \
+            .eq.return_value.execute.return_value = fake_result([])
+
+        resp = client.delete(f"/sessions/{TEST_SESSION_ID}", headers=DEV_AUTH)
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+
+    @patch("app.services.chat_service.supabase")
+    def test_existing_delete_all_still_works(self, mock_supabase):
+        """
+        Regression guard: DELETE /sessions must be unaffected by the addition
+        of the batch-delete endpoint.
+        """
+        mock_supabase.table.return_value.select.return_value \
+            .eq.return_value.execute.return_value = fake_result([
+                {"id": TEST_SESSION_ID},
+            ])
+        mock_supabase.table.return_value.delete.return_value \
+            .eq.return_value.execute.return_value = fake_result([])
+
+        resp = client.delete("/sessions", headers=DEV_AUTH)
+        assert resp.status_code == 200
+        assert resp.json()["deleted_count"] == 1
+

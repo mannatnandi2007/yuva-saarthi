@@ -25,6 +25,7 @@ from app.schemas import (
     SessionListItem,
     MessageHistoryItem,
     DeleteSessionResponse,
+    BatchDeleteRequest,
 )
 from app.services.chat_service import (
     create_session,
@@ -33,6 +34,7 @@ from app.services.chat_service import (
     get_message_history,
     delete_session,
     delete_all_sessions,
+    delete_sessions_batch,
 )
 
 # Legacy stub imports (kept so old pydantic models still work)
@@ -159,6 +161,42 @@ def remove_all_sessions(
         session_id=None,
         deleted_count=count,
         message=f"Deleted {count} sessions successfully",
+    )
+
+
+@router.post(
+    "/chat/sessions/batch-delete",
+    response_model=DeleteSessionResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Delete multiple chat sessions in a single request",
+)
+def batch_delete_sessions(
+    payload: BatchDeleteRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """
+    Batch-delete a list of sessions belonging to the authenticated user.
+
+    Behaviour:
+      - Ownership is validated for every supplied session_id before any
+        deletion begins. A 403 is raised immediately if any ID belongs to
+        another user; a 404 is raised if any ID does not exist.
+      - No sessions are deleted if any ownership check fails (all-or-nothing).
+      - Duplicate IDs in the request body are silently deduplicated.
+      - _IN_MEMORY_SUMMARIES cache is cleared for every deleted session.
+
+    The user_id is ALWAYS derived from the Bearer token, never from the
+    request body, so cross-user deletion is structurally impossible.
+    """
+    deleted = delete_sessions_batch(
+        session_ids=payload.session_ids,
+        user_id=current_user.user_id,
+    )
+    return DeleteSessionResponse(
+        success=True,
+        session_id=None,
+        deleted_count=deleted,
+        message=f"Batch deleted {deleted} session(s) successfully",
     )
 
 

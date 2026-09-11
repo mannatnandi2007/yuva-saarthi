@@ -67,6 +67,22 @@ class DeleteSessionResponse(BaseModel):
     message: str
 
 
+class BatchDeleteRequest(BaseModel):
+    """
+    Request body for POST /chat/sessions/batch-delete.
+
+    Accepts a non-empty list of session UUIDs to delete in a single request.
+    All sessions must belong to the authenticated user — any ownership violation
+    aborts the entire batch (no partial deletes).
+    Duplicate IDs are silently deduplicated before processing.
+    """
+    session_ids: List[str] = Field(
+        ...,
+        min_length=1,
+        description="Non-empty list of session UUIDs to delete. Duplicates are ignored.",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Chat
 # ---------------------------------------------------------------------------

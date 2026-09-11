@@ -295,6 +295,53 @@ def delete_all_sessions(user_id: str) -> int:
         )
 
 
+def delete_sessions_batch(session_ids: List[str], user_id: str) -> int:
+    """
+    Delete a specific list of sessions for user_id in a single call.
+    Called by POST /chat/sessions/batch-delete.
+
+    Behaviour:
+      - Duplicate IDs are silently deduplicated (preserving order) before
+        any deletion occurs, so callers need not pre-sanitise the list.
+      - Ownership is validated for EVERY ID before any deletions begin,
+        using validate_session_ownership().  If any session is missing (404)
+        or belongs to a different user (403) the HTTPException is raised
+        immediately and NO sessions are deleted (fail-fast, all-or-nothing).
+      - _IN_MEMORY_SUMMARIES cache is invalidated per session via the
+        reused delete_session() helper, which handles each ID atomically.
+
+    Returns:
+        int — the number of unique sessions actually deleted.
+    """
+    # 1. Deduplicate while preserving insertion order
+    unique_ids = list(dict.fromkeys(session_ids))
+
+    # 2. Pre-validate ownership for ALL IDs before touching the DB.
+    #    Any 404 / 403 aborts the entire batch — no partial deletes.
+    for session_id in unique_ids:
+        # Skip transient / dev sessions (validate_session_ownership handles
+        # them too, but checking here avoids the extra DB round-trip).
+        if not (str(session_id).startswith("local-") or session_id in ("default-session", "default")):
+            validate_session_ownership(session_id, user_id)
+
+    # 3. All ownership checks passed — now delete each session.
+    #    delete_session() handles DB deletion + cache invalidation.
+    deleted = 0
+    for session_id in unique_ids:
+        try:
+            delete_session(session_id=session_id, user_id=user_id)
+            deleted += 1
+        except HTTPException:
+            # Re-raise: this should only happen on transient race conditions
+            # (e.g. another process deleted the session between our pre-check
+            # and this delete call). Surface to the caller as-is.
+            raise
+    logger.info(
+        "[BATCH DELETE] Deleted %d sessions for user %s", deleted, user_id
+    )
+    return deleted
+
+
 def validate_session_ownership(session_id: str, user_id: str) -> dict:
     """
     Fetch the session and confirm it belongs to the authenticated user.
