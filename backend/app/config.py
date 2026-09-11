@@ -57,3 +57,13 @@ def trip_gemini_cooldown(seconds: float = 60.0) -> None:
     global _GEMINI_COOLDOWN_UNTIL
     _GEMINI_COOLDOWN_UNTIL = time.time() + seconds
 
+
+def get_gemini_cooldown_remaining() -> float:
+    """
+    Returns the number of seconds remaining on the Gemini circuit-breaker cooldown.
+    Returns 0.0 when Gemini is fully available (no cooldown active).
+    Used by GET /health/llm to surface provider state without exposing internals.
+    """
+    global _GEMINI_COOLDOWN_UNTIL
+    return max(0.0, _GEMINI_COOLDOWN_UNTIL - time.time())
+

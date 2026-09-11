@@ -1465,3 +1465,231 @@ class TestBatchDeleteSessions:
         assert resp.status_code == 200
         assert resp.json()["deleted_count"] == 1
 
+
+# ===========================================================================
+# Phase 6 — GET /health/llm
+# ===========================================================================
+
+class TestLLMHealth:
+    """
+    Tests for GET /health/llm (Phase 6).
+
+    All patches target app.routers.health — the point of use — not the
+    config module directly, so we test the HTTP contract not the import chain.
+
+    Scenarios:
+      1.  Gemini ok + Groq ok  → active_provider == "gemini"
+      2.  Gemini cooldown + Groq ok → active_provider == "groq", status == "cooldown"
+      3.  Gemini unconfigured + Groq ok → active_provider == "groq", status == "unconfigured"
+      4.  Groq unconfigured → groq.status == "unconfigured"
+      5.  Both unconfigured → active_provider == "local_fallback"
+      6.  No API key values appear anywhere in the response body
+      7.  No authentication required (no auth header → 200)
+      8.  cooldown_remaining_s == 0 when no cooldown is active
+    """
+
+    ENDPOINT = "/health/llm"
+
+    # Convenience: a settings-like object that controls key presence
+    class _FakeSettings:
+        def __init__(self, gemini_api_key=None, llm_api_key=None, groq_api_key=None):
+            self.gemini_api_key = gemini_api_key
+            self.llm_api_key = llm_api_key
+            self.groq_api_key = groq_api_key
+
+    # -----------------------------------------------------------------------
+    # Test 1: Gemini ok + Groq ok → active_provider = "gemini"
+    # -----------------------------------------------------------------------
+    def test_gemini_ok_groq_ok_returns_gemini_active(self):
+        """
+        When Gemini is configured and available, it must be the active provider,
+        even if Groq is also configured (Gemini is always preferred).
+        """
+        fake_settings = self._FakeSettings(
+            gemini_api_key="AIzaSy-fake-gemini-key",
+            groq_api_key="gsk_fake-groq-key",
+        )
+        with patch("app.routers.health.settings", fake_settings), \
+             patch("app.routers.health.is_gemini_available", return_value=True), \
+             patch("app.routers.health.get_gemini_cooldown_remaining", return_value=0.0):
+            resp = client.get(self.ENDPOINT)
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["active_provider"] == "gemini"
+        assert body["gemini"]["status"] == "ok"
+        assert body["gemini"]["available"] is True
+        assert body["gemini"]["cooldown_remaining_s"] == 0.0
+        assert body["groq"]["status"] == "ok"
+        assert body["groq"]["available"] is True
+
+    # -----------------------------------------------------------------------
+    # Test 2: Gemini cooldown + Groq ok → active_provider = "groq"
+    # -----------------------------------------------------------------------
+    def test_gemini_cooldown_groq_active(self):
+        """
+        When Gemini is in circuit-breaker cooldown, Groq must become the active
+        provider. gemini.status must be "cooldown" and cooldown_remaining_s > 0.
+        """
+        fake_settings = self._FakeSettings(
+            gemini_api_key="AIzaSy-fake-gemini-key",
+            groq_api_key="gsk_fake-groq-key",
+        )
+        with patch("app.routers.health.settings", fake_settings), \
+             patch("app.routers.health.is_gemini_available", return_value=False), \
+             patch("app.routers.health.get_gemini_cooldown_remaining", return_value=147.3):
+            resp = client.get(self.ENDPOINT)
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["active_provider"] == "groq"
+        assert body["gemini"]["status"] == "cooldown"
+        assert body["gemini"]["available"] is False
+        assert body["gemini"]["cooldown_remaining_s"] == 147.3
+        assert body["groq"]["status"] == "ok"
+
+    # -----------------------------------------------------------------------
+    # Test 3: Gemini unconfigured + Groq ok → active_provider = "groq"
+    # -----------------------------------------------------------------------
+    def test_gemini_unconfigured_groq_ok(self):
+        """
+        When no Gemini key is present, Groq becomes the active provider.
+        gemini.status must be "unconfigured".
+        """
+        fake_settings = self._FakeSettings(
+            gemini_api_key=None,
+            llm_api_key=None,
+            groq_api_key="gsk_fake-groq-key",
+        )
+        with patch("app.routers.health.settings", fake_settings), \
+             patch("app.routers.health.is_gemini_available", return_value=True), \
+             patch("app.routers.health.get_gemini_cooldown_remaining", return_value=0.0), \
+             patch.dict("os.environ", {"GEMINI_API_KEY": "", "LLM_API_KEY": ""}, clear=False):
+            resp = client.get(self.ENDPOINT)
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["gemini"]["status"] == "unconfigured"
+        assert body["gemini"]["available"] is False
+        assert body["active_provider"] == "groq"
+
+    # -----------------------------------------------------------------------
+    # Test 4: Groq unconfigured → groq.status == "unconfigured"
+    # -----------------------------------------------------------------------
+    def test_groq_unconfigured(self):
+        """Groq key absent → groq.status == 'unconfigured' and groq.available == False."""
+        fake_settings = self._FakeSettings(
+            gemini_api_key="AIzaSy-fake-gemini-key",
+            groq_api_key=None,
+        )
+        with patch("app.routers.health.settings", fake_settings), \
+             patch("app.routers.health.is_gemini_available", return_value=True), \
+             patch("app.routers.health.get_gemini_cooldown_remaining", return_value=0.0), \
+             patch.dict("os.environ", {"GROQ_API_KEY": ""}, clear=False):
+            resp = client.get(self.ENDPOINT)
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["groq"]["status"] == "unconfigured"
+        assert body["groq"]["available"] is False
+
+    # -----------------------------------------------------------------------
+    # Test 5: Both unconfigured → active_provider = "local_fallback"
+    # -----------------------------------------------------------------------
+    def test_both_unconfigured_returns_local_fallback(self):
+        """
+        When neither Gemini nor Groq is configured, the system falls back to
+        the local Hinglish engine. active_provider must be 'local_fallback'.
+        """
+        fake_settings = self._FakeSettings(
+            gemini_api_key=None,
+            llm_api_key=None,
+            groq_api_key=None,
+        )
+        with patch("app.routers.health.settings", fake_settings), \
+             patch("app.routers.health.is_gemini_available", return_value=True), \
+             patch("app.routers.health.get_gemini_cooldown_remaining", return_value=0.0), \
+             patch.dict("os.environ", {
+                 "GEMINI_API_KEY": "", "LLM_API_KEY": "", "GROQ_API_KEY": ""
+             }, clear=False):
+            resp = client.get(self.ENDPOINT)
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["active_provider"] == "local_fallback"
+        assert body["gemini"]["status"] == "unconfigured"
+        assert body["groq"]["status"] == "unconfigured"
+
+    # -----------------------------------------------------------------------
+    # Test 6: No API key values appear anywhere in the response body
+    # -----------------------------------------------------------------------
+    def test_no_api_keys_in_response(self):
+        """
+        Security: even when real-looking key values are injected into settings,
+        the response body must not contain any key substring.
+        """
+        fake_gemini_key = "AIzaSy-FAKE-GEMINI-KEY-DO-NOT-USE-12345"
+        fake_groq_key = "gsk_FAKE-GROQ-KEY-DO-NOT-USE-67890"
+
+        fake_settings = self._FakeSettings(
+            gemini_api_key=fake_gemini_key,
+            groq_api_key=fake_groq_key,
+        )
+        with patch("app.routers.health.settings", fake_settings), \
+             patch("app.routers.health.is_gemini_available", return_value=True), \
+             patch("app.routers.health.get_gemini_cooldown_remaining", return_value=0.0):
+            resp = client.get(self.ENDPOINT)
+
+        assert resp.status_code == 200
+        response_text = resp.text
+
+        # Neither the full key nor any recognisable prefix must appear
+        assert fake_gemini_key not in response_text, \
+            "Gemini API key value leaked into health response"
+        assert fake_groq_key not in response_text, \
+            "Groq API key value leaked into health response"
+        # Also check common key fingerprint prefixes
+        assert "AIzaSy" not in response_text, \
+            "Gemini key fingerprint prefix 'AIzaSy' found in response"
+        assert "gsk_" not in response_text, \
+            "Groq key fingerprint prefix 'gsk_' found in response"
+
+    # -----------------------------------------------------------------------
+    # Test 7: No authentication required
+    # -----------------------------------------------------------------------
+    def test_health_llm_no_auth_required(self):
+        """
+        GET /health/llm must return 200 with no Authorization header.
+        It is an ops/monitoring endpoint, not a user-facing resource.
+        """
+        fake_settings = self._FakeSettings(groq_api_key="gsk_fake-groq-key")
+        with patch("app.routers.health.settings", fake_settings), \
+             patch("app.routers.health.is_gemini_available", return_value=True), \
+             patch("app.routers.health.get_gemini_cooldown_remaining", return_value=0.0):
+            # Deliberately no headers= argument
+            resp = client.get(self.ENDPOINT)
+
+        assert resp.status_code == 200, \
+            f"Expected 200 without auth, got {resp.status_code}"
+
+    # -----------------------------------------------------------------------
+    # Test 8: cooldown_remaining_s == 0 when no cooldown is active
+    # -----------------------------------------------------------------------
+    def test_cooldown_remaining_is_zero_when_not_tripped(self):
+        """
+        When Gemini is available (circuit breaker not tripped),
+        cooldown_remaining_s must be exactly 0.0 in the response.
+        """
+        fake_settings = self._FakeSettings(gemini_api_key="AIzaSy-fake-gemini-key")
+        with patch("app.routers.health.settings", fake_settings), \
+             patch("app.routers.health.is_gemini_available", return_value=True), \
+             patch("app.routers.health.get_gemini_cooldown_remaining", return_value=0.0):
+            resp = client.get(self.ENDPOINT)
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["gemini"]["cooldown_remaining_s"] == 0.0, \
+            f"Expected cooldown_remaining_s=0.0, got {body['gemini']['cooldown_remaining_s']}"
+        assert body["gemini"]["status"] == "ok"
+
+

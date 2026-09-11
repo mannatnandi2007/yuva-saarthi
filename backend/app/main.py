@@ -3,7 +3,7 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, chat, risk, escalation, rag, users, demo
+from app.routers import auth, chat, risk, escalation, rag, users, demo, health
 from app.config import settings
 
 app = FastAPI(
@@ -29,6 +29,7 @@ app.include_router(escalation.router)
 app.include_router(rag.router)
 app.include_router(users.router)
 app.include_router(demo.router)  # Phase 5: Demo script integration
+app.include_router(health.router)  # Phase 6: LLM provider health
 
 @app.get("/")
 async def read_root():
