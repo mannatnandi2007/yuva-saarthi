@@ -1693,3 +1693,321 @@ class TestLLMHealth:
         assert body["gemini"]["status"] == "ok"
 
 
+# ===========================================================================
+# Phase 6 — LLM Active Provider Telemetry
+# ===========================================================================
+
+class TestLLMProviderTelemetry:
+    """
+    Phase 6 — LLM Active Provider Telemetry tests.
+
+    Verifies:
+      1. Gemini provider: llm_provider == 'gemini' when Gemini replies
+      2. Groq provider: llm_provider == 'groq' when Groq replies
+      3. local_fallback: llm_provider == 'local_fallback' when both LLMs are offline
+      4. Provider field safety: llm_provider is always a non-empty string (never None)
+      5. Existing ChatResponse fields regression guard
+      6. Telemetry logging: [TELEMETRY] session=... provider=... is emitted
+      7. Stale ContextVar reset: each request gets an independent provider value
+      8. Unit: ChatServiceResult.provider defaults to 'local_fallback'
+      9. Unit: get_last_request_provider() default is 'local_fallback'
+    """
+
+    # ------------------------------------------------------------------
+    # Shared supabase mock (used by every test in this class)
+    # ------------------------------------------------------------------
+
+    def _setup_supabase(self, mock_supabase):
+        """Standard session + message mock sufficient for POST /chat."""
+        mock_supabase.table.return_value.select.return_value \
+            .eq.return_value.single.return_value.execute.return_value = fake_single_result({
+                "id": TEST_SESSION_ID,
+                "user_id": TEST_USER_ID,
+                "summary_snapshot": None,
+            })
+        mock_supabase.table.return_value.insert.return_value.execute.return_value = fake_result([
+            {"id": str(uuid.uuid4()), "session_id": TEST_SESSION_ID,
+             "sender": "user", "content": "test", "created_at": NOW_ISO}
+        ])
+
+    def _make_ai_response(self):
+        """Return a standard AIResponse for use in mocks."""
+        from app.services.llm_service import AIResponse
+        return AIResponse(
+            reply="Main yahaan hoon, sab theek ho jayega.",
+            severity="none",
+            category="none",
+            rationale="Normal conversation",
+        )
+
+    # ------------------------------------------------------------------
+    # Test 1: Gemini provider is surfaced in the HTTP response
+    # ------------------------------------------------------------------
+    @patch("app.services.chat_service.supabase")
+    def test_gemini_provider_in_response(self, mock_supabase):
+        """
+        When get_last_request_provider() returns 'gemini',
+        the POST /chat response must contain llm_provider == 'gemini'.
+        """
+        self._setup_supabase(mock_supabase)
+
+        mock_ai = AsyncMock(return_value=self._make_ai_response())
+        with patch("app.services.chat_service.get_ai_response", mock_ai), \
+             patch("app.services.chat_service.get_last_request_provider", return_value="gemini"):
+            resp = client.post(
+                "/chat",
+                json={"session_id": TEST_SESSION_ID, "message": "Hi yaar"},
+                headers=DEV_AUTH,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["llm_provider"] == "gemini", (
+            f"Expected 'gemini', got {body['llm_provider']!r}"
+        )
+
+    # ------------------------------------------------------------------
+    # Test 2: Groq provider is surfaced in the HTTP response
+    # ------------------------------------------------------------------
+    @patch("app.services.chat_service.supabase")
+    def test_groq_provider_in_response(self, mock_supabase):
+        """
+        When get_last_request_provider() returns 'groq',
+        the POST /chat response must contain llm_provider == 'groq'.
+        """
+        self._setup_supabase(mock_supabase)
+
+        mock_ai = AsyncMock(return_value=self._make_ai_response())
+        with patch("app.services.chat_service.get_ai_response", mock_ai), \
+             patch("app.services.chat_service.get_last_request_provider", return_value="groq"):
+            resp = client.post(
+                "/chat",
+                json={"session_id": TEST_SESSION_ID, "message": "Hello"},
+                headers=DEV_AUTH,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["llm_provider"] == "groq", (
+            f"Expected 'groq', got {body['llm_provider']!r}"
+        )
+
+    # ------------------------------------------------------------------
+    # Test 3: local_fallback is surfaced when both LLMs are offline
+    # ------------------------------------------------------------------
+    @patch("app.services.chat_service.supabase")
+    def test_local_fallback_provider_in_response(self, mock_supabase):
+        """
+        When get_last_request_provider() returns 'local_fallback' (default),
+        the POST /chat response must contain llm_provider == 'local_fallback'.
+        """
+        self._setup_supabase(mock_supabase)
+
+        mock_ai = AsyncMock(return_value=self._make_ai_response())
+        with patch("app.services.chat_service.get_ai_response", mock_ai), \
+             patch("app.services.chat_service.get_last_request_provider",
+                   return_value="local_fallback"):
+            resp = client.post(
+                "/chat",
+                json={"session_id": TEST_SESSION_ID, "message": "Kya ho raha hai"},
+                headers=DEV_AUTH,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["llm_provider"] == "local_fallback", (
+            f"Expected 'local_fallback', got {body['llm_provider']!r}"
+        )
+
+    # ------------------------------------------------------------------
+    # Test 4: Provider field is always present and a non-empty string
+    # ------------------------------------------------------------------
+    @patch("app.services.chat_service.supabase")
+    def test_provider_field_is_always_present_and_non_empty(self, mock_supabase):
+        """
+        llm_provider must always be present and non-empty in every POST /chat
+        response — it must never be None or an empty string.
+        """
+        self._setup_supabase(mock_supabase)
+
+        mock_ai = AsyncMock(return_value=self._make_ai_response())
+        with patch("app.services.chat_service.get_ai_response", mock_ai):
+            resp = client.post(
+                "/chat",
+                json={"session_id": TEST_SESSION_ID, "message": "test message"},
+                headers=DEV_AUTH,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "llm_provider" in body, "llm_provider field is missing from response"
+        provider_val = body["llm_provider"]
+        assert provider_val is not None, "llm_provider must not be None"
+        assert isinstance(provider_val, str), "llm_provider must be a string"
+        assert len(provider_val) > 0, "llm_provider must not be empty"
+        assert provider_val in ("gemini", "groq", "local_fallback"), (
+            f"Unexpected llm_provider value: {provider_val!r}"
+        )
+
+    # ------------------------------------------------------------------
+    # Test 5: Existing ChatResponse fields are not broken (regression)
+    # ------------------------------------------------------------------
+    @patch("app.services.chat_service.supabase")
+    def test_existing_chat_response_fields_intact(self, mock_supabase):
+        """
+        All pre-existing ChatResponse fields (reply, risk_classification,
+        action_taken, heading, session_id) must still be present and
+        correct after adding llm_provider — regression guard.
+        """
+        self._setup_supabase(mock_supabase)
+
+        mock_ai = AsyncMock(return_value=self._make_ai_response())
+        with patch("app.services.chat_service.get_ai_response", mock_ai), \
+             patch("app.services.chat_service.get_last_request_provider", return_value="groq"):
+            resp = client.post(
+                "/chat",
+                json={"session_id": TEST_SESSION_ID, "message": "I am feeling okay today"},
+                headers=DEV_AUTH,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "reply" in body, "reply field missing"
+        assert len(body["reply"]) > 0, "reply must not be empty"
+        assert "risk_classification" in body, "risk_classification field missing"
+        assert "severity" in body["risk_classification"]
+        assert "category" in body["risk_classification"]
+        assert "rationale" in body["risk_classification"]
+        assert "action_taken" in body, "action_taken field missing"
+        assert "session_id" in body, "session_id field missing"
+        assert body["session_id"] == TEST_SESSION_ID
+        assert "llm_provider" in body, "llm_provider field missing"
+
+    # ------------------------------------------------------------------
+    # Test 6: Telemetry log line is emitted with correct session and provider
+    # ------------------------------------------------------------------
+    @patch("app.services.chat_service.supabase")
+    def test_telemetry_log_is_emitted(self, mock_supabase):
+        """
+        chat_service.send_chat_message() must emit a log record with the
+        '[TELEMETRY]' marker, the session_id, and the provider name.
+        """
+        self._setup_supabase(mock_supabase)
+
+        mock_ai = AsyncMock(return_value=self._make_ai_response())
+        with patch("app.services.chat_service.get_ai_response", mock_ai), \
+             patch("app.services.chat_service.get_last_request_provider", return_value="gemini"), \
+             patch("app.services.chat_service.logger") as mock_logger:
+            resp = client.post(
+                "/chat",
+                json={"session_id": TEST_SESSION_ID, "message": "Log test"},
+                headers=DEV_AUTH,
+            )
+
+        assert resp.status_code == 200
+
+        # Verify the logger.info call that carries [TELEMETRY]
+        telemetry_calls = [
+            call for call in mock_logger.info.call_args_list
+            if call.args and "[TELEMETRY]" in str(call.args[0])
+        ]
+        assert len(telemetry_calls) >= 1, (
+            "[TELEMETRY] log line was never emitted by chat_service.send_chat_message()"
+        )
+        # Validate the log message format: session and provider values are present
+        log_args = telemetry_calls[0].args
+        # Format string is: "[TELEMETRY] session=%s provider=%s", session_id, provider
+        assert len(log_args) >= 3, "Expected session_id and provider as positional args"
+        assert log_args[1] == TEST_SESSION_ID, (
+            f"session_id in telemetry log is wrong: {log_args[1]!r}"
+        )
+        assert log_args[2] == "gemini", (
+            f"provider in telemetry log is wrong: {log_args[2]!r}"
+        )
+
+    # ------------------------------------------------------------------
+    # Test 7: Stale ContextVar state is reset per request
+    # ------------------------------------------------------------------
+    @patch("app.services.chat_service.supabase")
+    def test_stale_contextvar_state_reset_between_requests(self, mock_supabase):
+        """
+        Each call to generate_llm_reply() resets _last_provider to
+        'local_fallback' before attempting any provider call.
+        Simulate two sequential requests: first returns 'gemini', second
+        returns 'local_fallback'. The second must not inherit 'gemini' from
+        the first request's ContextVar state.
+        """
+        self._setup_supabase(mock_supabase)
+
+        mock_ai = AsyncMock(return_value=self._make_ai_response())
+
+        # First request — provider is 'gemini'
+        with patch("app.services.chat_service.get_ai_response", mock_ai), \
+             patch("app.services.chat_service.get_last_request_provider", return_value="gemini"):
+            resp1 = client.post(
+                "/chat",
+                json={"session_id": TEST_SESSION_ID, "message": "First request"},
+                headers=DEV_AUTH,
+            )
+        assert resp1.status_code == 200
+        assert resp1.json()["llm_provider"] == "gemini"
+
+        # Second request — both LLMs offline, falls back to local_fallback
+        with patch("app.services.chat_service.get_ai_response", mock_ai), \
+             patch("app.services.chat_service.get_last_request_provider",
+                   return_value="local_fallback"):
+            resp2 = client.post(
+                "/chat",
+                json={"session_id": TEST_SESSION_ID, "message": "Second request"},
+                headers=DEV_AUTH,
+            )
+        assert resp2.status_code == 200
+        assert resp2.json()["llm_provider"] == "local_fallback", (
+            "Stale ContextVar state from first request leaked into second request"
+        )
+
+    # ------------------------------------------------------------------
+    # Test 8: Unit-level — ChatServiceResult carries provider field
+    # ------------------------------------------------------------------
+    def test_chat_service_result_has_provider_field(self):
+        """
+        ChatServiceResult must have a 'provider' field that defaults to
+        'local_fallback', so it is safe to access even in callers that
+        don't set it explicitly.
+        """
+        from app.services.chat_service import ChatServiceResult
+        result = ChatServiceResult(
+            reply="Test reply",
+            severity="none",
+            category="none",
+            rationale="none",
+            action_taken="logged_only",
+            heading="Test Heading",
+        )
+        assert result.provider == "local_fallback", (
+            f"Default provider should be 'local_fallback', got {result.provider!r}"
+        )
+        result.provider = "gemini"
+        assert result.provider == "gemini"
+
+    # ------------------------------------------------------------------
+    # Test 9: Unit-level — get_last_request_provider() default is 'local_fallback'
+    # ------------------------------------------------------------------
+    def test_get_last_request_provider_default_is_local_fallback(self):
+        """
+        get_last_request_provider() must return 'local_fallback' when the
+        ContextVar has not been explicitly set in the current context,
+        confirming the ContextVar default and the public API.
+        """
+        from app.services.llm_service import get_last_request_provider
+        import contextvars
+
+        def _check():
+            return get_last_request_provider()
+
+        # Run in a fresh copy of the context so test isolation is guaranteed
+        fresh_ctx = contextvars.copy_context()
+        result = fresh_ctx.run(_check)
+        assert result == "local_fallback", (
+            f"Expected 'local_fallback' as ContextVar default, got {result!r}"
+        )

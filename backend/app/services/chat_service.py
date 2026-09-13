@@ -18,7 +18,7 @@ from fastapi import HTTPException, status
 
 from app.config import settings
 from app.supabase_client import supabase
-from app.services.llm_service import get_ai_response, AIResponse
+from app.services.llm_service import get_ai_response, AIResponse, get_last_request_provider
 from app.schemas import MessageHistoryItem
 
 
@@ -37,6 +37,7 @@ class ChatServiceResult:
     rationale: str
     action_taken: str
     heading: Optional[str] = None
+    provider: str = "local_fallback"  # Phase 6 telemetry: 'gemini' | 'groq' | 'local_fallback'
 
 
 # ---------------------------------------------------------------------------
@@ -524,6 +525,10 @@ async def send_chat_message(
         rolling_summary=rolling_summary,
     )
 
+    # Phase 6 Telemetry: read which provider actually served this request
+    active_provider = get_last_request_provider()
+    logger.info("[TELEMETRY] session=%s provider=%s", session_id, active_provider)
+
     # Step 4: Persist the assistant's response with risk metadata
     save_message(
         session_id=session_id,
@@ -602,6 +607,7 @@ async def send_chat_message(
         rationale=ai_result.rationale,
         action_taken=action_taken,
         heading=heading,
+        provider=active_provider,
     )
 
 

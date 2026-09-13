@@ -111,6 +111,7 @@ class ChatResponse(BaseModel):
     action_taken: str  # matches action_taken_type DB enum
     heading: Optional[str] = None
     session_id: Optional[str] = None
+    llm_provider: Optional[str] = None  # Phase 6 telemetry: 'gemini' | 'groq' | 'local_fallback'
 
 
 # ---------------------------------------------------------------------------

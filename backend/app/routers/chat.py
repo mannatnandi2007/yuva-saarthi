@@ -243,6 +243,7 @@ async def chat(
         action_taken=result.action_taken,
         heading=result.heading,
         session_id=payload.session_id,
+        llm_provider=result.provider,
     )
 
 

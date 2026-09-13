@@ -22,6 +22,7 @@ import re
 import logging
 from typing import Optional
 from dataclasses import dataclass
+import contextvars
 
 from app.config import settings, is_gemini_available, trip_gemini_cooldown
 from app.services.pre_filter import check_message_tripwire
@@ -38,6 +39,26 @@ from langchain_core.runnables import RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Request-scoped provider telemetry (ContextVar — async-safe, per-task)
+# ---------------------------------------------------------------------------
+_last_provider: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "_last_provider",
+    default="local_fallback",
+)
+
+
+def get_last_request_provider() -> str:
+    """
+    Return the provider that actually served the current LLM request.
+    Set to 'gemini' or 'groq' at the exact point of successful return
+    inside generate_llm_reply().  Defaults to 'local_fallback' if neither
+    provider returned a reply for this request.
+    Safe to call from chat_service.py after get_ai_response() returns.
+    """
+    return _last_provider.get()
+
 
 
 YUVAA_COMPANION_SYSTEM_PROMPT = """You are YUVAA Saarthi, a compassionate, warm, non-judgmental youth well-being companion designed specifically for Indian teenagers and young adults.
@@ -194,12 +215,16 @@ def generate_llm_reply(
     Auto-failover: Groq Cloud
     Guaranteed: User never sees provider or model brand.
     """
+    # Reset provider to default at the START of every call — prevents stale
+    # state from any prior request that ran in the same async context.
+    _last_provider.set("local_fallback")
     # 1. Try Gemini (if not in quota cooldown)
     if is_gemini_available():
         gemini_key = settings.gemini_api_key or settings.llm_api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("LLM_API_KEY")
         if gemini_key and not gemini_key.startswith("your-") and not gemini_key.startswith("placeholder"):
             reply = _call_gemini_chat(user_message, rolling_summary, gemini_key, crisis_guidance=crisis_guidance)
             if reply:
+                _last_provider.set("gemini")  # Causal: set at the actual success point
                 return reply
 
     # 2. Auto-switch to Groq Cloud if Gemini fails or is unconfigured
@@ -207,6 +232,7 @@ def generate_llm_reply(
     if groq_key and not groq_key.startswith("your-") and not groq_key.startswith("placeholder"):
         reply = _call_groq_chat(user_message, rolling_summary, groq_key, crisis_guidance=crisis_guidance)
         if reply:
+            _last_provider.set("groq")  # Causal: set at the actual success point
             return reply
 
     return None
