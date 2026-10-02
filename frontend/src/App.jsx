@@ -221,7 +221,7 @@ export default function App() {
             emergencyContacts={emergencyContacts}
           />
         ) : (
-          <div style={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px', overflowY: 'auto' }}>
             {currentPage === 'signup' && (
               <Signup 
                 onComplete={handleSignupComplete} 

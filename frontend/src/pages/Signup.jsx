@@ -172,7 +172,7 @@ export default function Signup({ onComplete, onNavigate }) {
   };
 
   return (
-    <div style={{ width: '100%', maxWidth: '560px', margin: '0 auto' }} className="animate-slideup">
+    <div style={{ width: '100%', maxWidth: '560px', margin: 'auto' }} className="animate-slideup">
       <div className="glass-panel" style={{ padding: '36px 32px', position: 'relative', overflow: 'hidden' }}>
         
         {/* Subtle decorative glow */}
@@ -188,7 +188,7 @@ export default function Signup({ onComplete, onNavigate }) {
 
         {/* Card Header */}
         <div style={{ marginBottom: '22px' }}>
-          <h2 style={{ fontSize: '1.45rem', fontWeight: '800', letterSpacing: '-0.02em', marginBottom: '6px', color: '#f4f4f5' }}>
+          <h2 style={{ fontSize: '1.45rem', fontWeight: '800', letterSpacing: '-0.02em', marginBottom: '6px', color: 'var(--text-primary)' }}>
             {isLoginMode ? "Welcome Back" : "Create Safe Account"}
           </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', lineHeight: '1.4' }}>
@@ -201,8 +201,8 @@ export default function Signup({ onComplete, onNavigate }) {
         {/* Segmented Tab Switcher */}
         <div style={{
           display: 'flex',
-          background: 'rgba(255, 255, 255, 0.04)',
-          border: '1px solid rgba(255, 255, 255, 0.06)',
+          background: 'rgba(0, 0, 0, 0.04)',
+          border: '1px solid rgba(0, 0, 0, 0.05)',
           borderRadius: '12px',
           padding: '4px',
           marginBottom: '24px'
