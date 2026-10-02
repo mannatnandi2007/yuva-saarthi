@@ -16,9 +16,9 @@ export default function MomoCompanion({ mood }) {
   const speechText = useMemo(() => {
     switch (mood) {
       case 'SAD': return "I'm here for you 💙";
-      case 'ANGRY': return "Take a deep breath 🌿";
+      case 'ANGRY': return "Take a slow, deep breath 🌿";
       case 'HAPPY': return "Love to see you smile! 💜";
-      case 'OVERJOYED': return "You're glowing! ✨";
+      case 'OVERJOYED': return "You're glowing today! ✨";
       default: return "I'm here with you 💜";
     }
   }, [mood]);
@@ -165,7 +165,7 @@ export default function MomoCompanion({ mood }) {
       height: '100%',
       overflow: 'hidden',
       position: 'relative',
-      background: 'linear-gradient(175deg, #E8E2FF 0%, #EDE8FF 30%, #F5F0FF 55%, #FDF2F8 80%, #F8F0FF 100%)',
+      background: '#faf5ff',
     }}>
       <style>{`
         @keyframes momoFloat {
@@ -189,11 +189,6 @@ export default function MomoCompanion({ mood }) {
           50% { transform: translateX(10px); }
         }
       `}</style>
-
-      {/* Decorative pastel blobs */}
-      <div style={{ position: 'absolute', top: '-30px', right: '-40px', width: '180px', height: '180px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(216, 180, 254, 0.4) 0%, transparent 70%)', pointerEvents: 'none', animation: 'blobPulse 8s infinite ease-in-out' }} />
-      <div style={{ position: 'absolute', bottom: '80px', left: '-30px', width: '140px', height: '140px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(129, 140, 248, 0.3) 0%, transparent 70%)', pointerEvents: 'none', animation: 'blobPulse 10s infinite ease-in-out 2s' }} />
-      <div style={{ position: 'absolute', top: '40%', right: '10px', width: '100px', height: '100px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(244, 114, 182, 0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
       {/* Clouds at the bottom */}
       <div style={{
@@ -313,12 +308,13 @@ export default function MomoCompanion({ mood }) {
               fontWeight: '600',
             }}>Current Mood</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '1.5rem' }}>
-                {mood === 'HAPPY' ? '😊' :
-                 mood === 'OVERJOYED' ? '🤩' :
-                 mood === 'SAD' ? '😔' :
-                 mood === 'ANGRY' ? '😠' : '😌'}
-              </span>
+              <span style={{ 
+                width: '10px', 
+                height: '10px', 
+                borderRadius: '50%', 
+                background: '#a855f7',
+                display: 'inline-block' 
+              }} />
               <span style={{
                 fontWeight: '700',
                 color: '#7c3aed',

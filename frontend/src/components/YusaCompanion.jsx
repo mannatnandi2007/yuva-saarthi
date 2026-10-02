@@ -36,10 +36,10 @@ export default function YusaCompanion({ mood }) {
   const speechText = useMemo(() => {
     switch (mood) {
       case 'SAD': return "I'm here for you 💙";
-      case 'ANGRY': return "Take a deep breath 🌿";
+      case 'ANGRY': return "Take a slow, deep breath 🌿";
       case 'HAPPY': return "Love to see you smile! 💜";
-      case 'OVERJOYED': return "You're glowing! ✨";
-      case 'ANXIOUS': return "We'll get through this 💜";
+      case 'OVERJOYED': return "You're glowing today! ✨";
+      case 'ANXIOUS': return "We will get through this together 💜";
       case 'SCARED': return "You are safe here 🛡️";
       case 'LONELY': return "I'm right here with you 🫂";
       case 'TIRED': return "Rest is important 🌙";
@@ -48,224 +48,248 @@ export default function YusaCompanion({ mood }) {
     }
   }, [mood]);
 
-  // Yusa visual states based on mood — DO NOT CHANGE DETECTION LOGIC
+  // Yusa visual states based on mood (Task 2: jumping & wiggling when happy, drooping when sad, etc.)
   const visualState = useMemo(() => {
     switch (mood) {
       case 'HAPPY':
         return {
           eyes: (
             <g>
-              <ellipse cx="90" cy="110" rx="12" ry="18" fill="#1e293b" />
+              <ellipse cx="90" cy="110" rx="12" ry="18" fill="#2e1065" />
               <circle cx="93" cy="103" r="5" fill="white" />
-              <circle cx="85" cy="118" r="2" fill="white" />
-              <ellipse cx="150" cy="110" rx="12" ry="18" fill="#1e293b" />
+              <circle cx="85" cy="118" r="2.5" fill="white" />
+              <ellipse cx="150" cy="110" rx="12" ry="18" fill="#2e1065" />
               <circle cx="153" cy="103" r="5" fill="white" />
-              <circle cx="145" cy="118" r="2" fill="white" />
+              <circle cx="145" cy="118" r="2.5" fill="white" />
             </g>
           ),
           mouth: (
-            <path d="M 110 135 Q 120 150 130 135" fill="none" stroke="#f472b6" strokeWidth="4" strokeLinecap="round" />
+            <path d="M 108 134 Q 120 152 132 134" fill="none" stroke="#ec4899" strokeWidth="5" strokeLinecap="round" />
           ),
           blush: true,
-          color: '#FDE047', // Soft yellow
-          scale: 'scale(1)',
-          animation: 'yusaFloat 3s infinite ease-in-out'
+          color: '#f472b6', // Vibrant Pink
+          scale: 'scale(1.04)',
+          animation: 'yusaJumpWiggle 1.3s infinite cubic-bezier(0.28, 0.84, 0.42, 1)',
+          sparkles: true
         };
       case 'OVERJOYED':
         return {
           eyes: (
             <g>
-              <path d="M 75 110 Q 90 95 105 110" fill="none" stroke="#1e293b" strokeWidth="6" strokeLinecap="round" />
-              <path d="M 135 110 Q 150 95 165 110" fill="none" stroke="#1e293b" strokeWidth="6" strokeLinecap="round" />
+              <path d="M 75 110 Q 90 92 105 110" fill="none" stroke="#2e1065" strokeWidth="6" strokeLinecap="round" />
+              <path d="M 135 110 Q 150 92 165 110" fill="none" stroke="#2e1065" strokeWidth="6" strokeLinecap="round" />
             </g>
           ),
           mouth: (
-            <path d="M 105 130 Q 120 160 135 130 Z" fill="#f472b6" stroke="#f472b6" strokeWidth="2" strokeLinejoin="round" />
+            <path d="M 105 130 Q 120 162 135 130 Z" fill="#ec4899" stroke="#db2777" strokeWidth="2" strokeLinejoin="round" />
           ),
           blush: true,
-          color: '#FBBF24', // Warm golden
-          scale: 'scale(1.05)',
-          animation: 'yusaFloat 2s infinite ease-in-out'
+          color: '#ec4899', // Rich radiant pink
+          scale: 'scale(1.08)',
+          animation: 'yusaJumpWiggle 0.95s infinite cubic-bezier(0.28, 0.84, 0.42, 1)',
+          sparkles: true
         };
       case 'SAD':
         return {
           eyes: (
             <g>
-              <ellipse cx="90" cy="115" rx="12" ry="12" fill="#1e293b" />
-              <circle cx="93" cy="112" r="4" fill="white" />
-              <path d="M 75 100 Q 90 90 105 105" fill="none" stroke="#1e293b" strokeWidth="4" strokeLinecap="round" />
-              <ellipse cx="150" cy="115" rx="12" ry="12" fill="#1e293b" />
-              <circle cx="153" cy="112" r="4" fill="white" />
-              <path d="M 135 105 Q 150 90 165 100" fill="none" stroke="#1e293b" strokeWidth="4" strokeLinecap="round" />
+              <ellipse cx="90" cy="116" rx="11" ry="11" fill="#2e1065" />
+              <circle cx="93" cy="113" r="3.5" fill="white" />
+              <path d="M 75 102 Q 90 92 105 106" fill="none" stroke="#2e1065" strokeWidth="4" strokeLinecap="round" />
+              <ellipse cx="150" cy="116" rx="11" ry="11" fill="#2e1065" />
+              <circle cx="153" cy="113" r="3.5" fill="white" />
+              <path d="M 135 106 Q 150 92 165 102" fill="none" stroke="#2e1065" strokeWidth="4" strokeLinecap="round" />
             </g>
           ),
           mouth: (
-            <path d="M 112 145 Q 120 135 128 145" fill="none" stroke="#94a3b8" strokeWidth="4" strokeLinecap="round" />
+            <path d="M 112 146 Q 120 136 128 146" fill="none" stroke="#8b729e" strokeWidth="4" strokeLinecap="round" />
           ),
           blush: false,
-          color: '#93C5FD', // Light blue
-          scale: 'scale(0.95)',
-          animation: 'none'
+          color: '#c4b5fd', // Soft muted purple
+          scale: 'scale(0.94)',
+          animation: 'yusaDroop 3.6s infinite ease-in-out',
+          sparkles: false
         };
       case 'ANGRY':
         return {
           eyes: (
             <g>
-              {/* Sharply angled, thick V-shaped eyebrows */}
-              <path d="M 65 90 Q 90 85 105 105" fill="none" stroke="#451a03" strokeWidth="8" strokeLinecap="round" />
-              <path d="M 175 90 Q 150 85 135 105" fill="none" stroke="#451a03" strokeWidth="8" strokeLinecap="round" />
-              {/* Round dark eyes */}
-              <ellipse cx="90" cy="120" rx="12" ry="12" fill="#451a03" />
-              <ellipse cx="150" cy="120" rx="12" ry="12" fill="#451a03" />
+              <path d="M 68 90 Q 90 85 105 105" fill="none" stroke="#4a044e" strokeWidth="8" strokeLinecap="round" />
+              <path d="M 172 90 Q 150 85 135 105" fill="none" stroke="#4a044e" strokeWidth="8" strokeLinecap="round" />
+              <ellipse cx="90" cy="120" rx="11" ry="11" fill="#4a044e" />
+              <ellipse cx="150" cy="120" rx="11" ry="11" fill="#4a044e" />
             </g>
           ),
           mouth: (
-            /* Deep, thick frown */
-            <path d="M 95 155 Q 120 135 145 155" fill="none" stroke="#451a03" strokeWidth="8" strokeLinecap="round" />
+            <path d="M 98 154 Q 120 136 142 154" fill="none" stroke="#4a044e" strokeWidth="7" strokeLinecap="round" />
           ),
           blush: false,
-          color: '#ea580c', // Deep fiery orange-red
+          color: '#be185d', // Deep ruby rose
           scale: 'scale(0.98)',
-          animation: 'none'
+          animation: 'yusaAngryPulse 0.8s infinite ease-in-out',
+          sparkles: false
         };
       case 'ANXIOUS':
         return {
           eyes: (
             <g>
-              <ellipse cx="90" cy="115" rx="10" ry="10" fill="#1e293b" />
-              <path d="M 75 95 Q 90 90 105 100" fill="none" stroke="#1e293b" strokeWidth="4" strokeLinecap="round" />
-              <ellipse cx="150" cy="115" rx="10" ry="10" fill="#1e293b" />
-              <path d="M 135 100 Q 150 90 165 95" fill="none" stroke="#1e293b" strokeWidth="4" strokeLinecap="round" />
+              <ellipse cx="90" cy="115" rx="10" ry="10" fill="#2e1065" />
+              <path d="M 75 95 Q 90 90 105 100" fill="none" stroke="#2e1065" strokeWidth="4" strokeLinecap="round" />
+              <ellipse cx="150" cy="115" rx="10" ry="10" fill="#2e1065" />
+              <path d="M 135 100 Q 150 90 165 95" fill="none" stroke="#2e1065" strokeWidth="4" strokeLinecap="round" />
             </g>
           ),
           mouth: (
-            <path d="M 112 140 Q 116 135 120 140 T 128 140" fill="none" stroke="#94a3b8" strokeWidth="4" strokeLinecap="round" />
+            <path d="M 112 140 Q 116 135 120 140 T 128 140" fill="none" stroke="#8b729e" strokeWidth="4" strokeLinecap="round" />
           ),
           blush: false,
-          color: '#FDBA74', // Soft orange
+          color: '#fbcfe8', // Pale soft pink
           scale: 'scale(0.96)',
-          animation: 'yusaFloat 1.5s infinite ease-in-out'
+          animation: 'yusaAnxiousTremble 0.28s infinite ease-in-out',
+          sparkles: false
         };
       case 'SCARED':
         return {
           eyes: (
             <g>
-              <ellipse cx="90" cy="110" rx="13" ry="13" fill="#1e293b" />
-              <circle cx="90" cy="110" r="3" fill="white" />
-              <path d="M 75 90 Q 90 85 105 95" fill="none" stroke="#1e293b" strokeWidth="4" strokeLinecap="round" />
-              <ellipse cx="150" cy="110" rx="13" ry="13" fill="#1e293b" />
-              <circle cx="150" cy="110" r="3" fill="white" />
-              <path d="M 135 95 Q 150 85 165 90" fill="none" stroke="#1e293b" strokeWidth="4" strokeLinecap="round" />
-              {/* Sweat drop / blue teardrop on head */}
-              <path d="M 180 80 Q 190 95 180 105 Q 170 95 180 80 Z" fill="#60A5FA" opacity="0.8" />
+              <ellipse cx="90" cy="110" rx="13" ry="13" fill="#2e1065" />
+              <circle cx="90" cy="110" r="3.5" fill="white" />
+              <path d="M 75 90 Q 90 85 105 95" fill="none" stroke="#2e1065" strokeWidth="4" strokeLinecap="round" />
+              <ellipse cx="150" cy="110" rx="13" ry="13" fill="#2e1065" />
+              <circle cx="150" cy="110" r="3.5" fill="white" />
+              <path d="M 135 95 Q 150 85 165 90" fill="none" stroke="#2e1065" strokeWidth="4" strokeLinecap="round" />
+              <path d="M 180 80 Q 190 95 180 105 Q 170 95 180 80 Z" fill="#ec4899" opacity="0.85" />
             </g>
           ),
           mouth: (
-            <ellipse cx="120" cy="140" rx="6" ry="10" fill="#1e293b" />
+            <ellipse cx="120" cy="140" rx="6" ry="10" fill="#2e1065" />
           ),
           blush: false,
-          color: '#CBD5E1', // Pale grayish blue
+          color: '#e9d5ff',
           scale: 'scale(0.95)',
-          animation: 'yusaFloat 1s infinite ease-in-out'
+          animation: 'yusaAnxiousTremble 0.24s infinite ease-in-out',
+          sparkles: false
         };
       case 'VERY_SCARED':
         return {
           eyes: (
             <g>
-              {/* Raised slanted eyebrows */}
-              <path d="M 70 80 Q 90 65 105 80" fill="none" stroke="#1e293b" strokeWidth="5" strokeLinecap="round" />
-              <path d="M 135 80 Q 150 65 170 80" fill="none" stroke="#1e293b" strokeWidth="5" strokeLinecap="round" />
-              {/* Wide terrified eyes with tiny pupils */}
-              <ellipse cx="90" cy="110" rx="14" ry="16" fill="#1e293b" />
+              <path d="M 70 80 Q 90 65 105 80" fill="none" stroke="#2e1065" strokeWidth="5" strokeLinecap="round" />
+              <path d="M 135 80 Q 150 65 170 80" fill="none" stroke="#2e1065" strokeWidth="5" strokeLinecap="round" />
+              <ellipse cx="90" cy="110" rx="14" ry="16" fill="#2e1065" />
               <ellipse cx="90" cy="110" rx="11" ry="13" fill="white" />
-              <circle cx="90" cy="110" r="3" fill="#1e293b" />
-              <ellipse cx="150" cy="110" rx="14" ry="16" fill="#1e293b" />
+              <circle cx="90" cy="110" r="3" fill="#2e1065" />
+              <ellipse cx="150" cy="110" rx="14" ry="16" fill="#2e1065" />
               <ellipse cx="150" cy="110" rx="11" ry="13" fill="white" />
-              <circle cx="150" cy="110" r="3" fill="#1e293b" />
+              <circle cx="150" cy="110" r="3" fill="#2e1065" />
             </g>
           ),
           mouth: (
-            <path d="M 100 140 C 100 120 140 120 140 140 C 140 160 100 160 100 140 Z" fill="#854d0e" stroke="#1e293b" strokeWidth="3" />
+            <path d="M 100 140 C 100 120 140 120 140 140 C 140 160 100 160 100 140 Z" fill="#8b5cf6" stroke="#2e1065" strokeWidth="3" />
           ),
           blush: false,
-          color: 'url(#fearGradient)',
-          scale: 'scale(0.95)',
-          animation: 'yusaFloat 0.3s infinite ease-in-out'
+          color: '#d8b4fe',
+          scale: 'scale(0.94)',
+          animation: 'yusaAnxiousTremble 0.18s infinite ease-in-out',
+          sparkles: false
         };
       case 'LONELY':
         return {
           eyes: (
             <g>
-              <ellipse cx="90" cy="115" rx="11" ry="11" fill="#1e293b" />
+              <ellipse cx="90" cy="115" rx="11" ry="11" fill="#2e1065" />
               <circle cx="93" cy="112" r="3" fill="white" />
-              <path d="M 75 100 Q 90 95 105 105" fill="none" stroke="#1e293b" strokeWidth="3" strokeLinecap="round" />
-              <ellipse cx="150" cy="115" rx="11" ry="11" fill="#1e293b" />
+              <path d="M 75 100 Q 90 95 105 105" fill="none" stroke="#2e1065" strokeWidth="3" strokeLinecap="round" />
+              <ellipse cx="150" cy="115" rx="11" ry="11" fill="#2e1065" />
               <circle cx="153" cy="112" r="3" fill="white" />
-              <path d="M 135 105 Q 150 95 165 100" fill="none" stroke="#1e293b" strokeWidth="3" strokeLinecap="round" />
+              <path d="M 135 105 Q 150 95 165 100" fill="none" stroke="#2e1065" strokeWidth="3" strokeLinecap="round" />
             </g>
           ),
           mouth: (
-            <path d="M 115 145 L 125 145" fill="none" stroke="#94a3b8" strokeWidth="4" strokeLinecap="round" />
+            <path d="M 115 145 L 125 145" fill="none" stroke="#8b729e" strokeWidth="4" strokeLinecap="round" />
           ),
           blush: false,
-          color: '#C4B5FD', // Soft purple
-          scale: 'scale(0.98)',
-          animation: 'yusaFloat 4s infinite ease-in-out'
+          color: '#c4b5fd',
+          scale: 'scale(0.96)',
+          animation: 'yusaDroop 4.2s infinite ease-in-out',
+          sparkles: false
         };
       case 'TIRED':
         return {
           eyes: (
             <g>
-              <path d="M 75 115 Q 90 125 105 115" fill="none" stroke="#1e293b" strokeWidth="5" strokeLinecap="round" />
-              <path d="M 135 115 Q 150 125 165 115" fill="none" stroke="#1e293b" strokeWidth="5" strokeLinecap="round" />
+              <path d="M 75 115 Q 90 125 105 115" fill="none" stroke="#2e1065" strokeWidth="5" strokeLinecap="round" />
+              <path d="M 135 115 Q 150 125 165 115" fill="none" stroke="#2e1065" strokeWidth="5" strokeLinecap="round" />
             </g>
           ),
           mouth: (
             <ellipse cx="120" cy="145" rx="5" ry="5" fill="#f472b6" />
           ),
           blush: true,
-          color: '#D6D3D1', // Warm grey
-          scale: 'scale(0.97)',
-          animation: 'yusaFloat 5s infinite ease-in-out'
+          color: '#e2e8f0',
+          scale: 'scale(0.96)',
+          animation: 'yusaSleepySway 4.5s infinite ease-in-out',
+          sparkles: false
         };
       case 'CONFUSED':
         return {
           eyes: (
             <g>
-              {/* Spiral/rolling eyes */}
-              <circle cx="90" cy="110" r="14" fill="white" stroke="#1e293b" strokeWidth="3" />
-              <path d="M 90 102 A 4 4 0 0 1 96 110 A 8 8 0 0 0 82 110 A 12 12 0 0 1 100 110" fill="none" stroke="#1e293b" strokeWidth="2.5" />
-              
-              <circle cx="150" cy="110" r="14" fill="white" stroke="#1e293b" strokeWidth="3" />
-              <path d="M 150 102 A 4 4 0 0 1 156 110 A 8 8 0 0 0 142 110 A 12 12 0 0 1 160 110" fill="none" stroke="#1e293b" strokeWidth="2.5" />
+              <circle cx="90" cy="110" r="14" fill="white" stroke="#2e1065" strokeWidth="3" />
+              <path d="M 90 102 A 4 4 0 0 1 96 110 A 8 8 0 0 0 82 110 A 12 12 0 0 1 100 110" fill="none" stroke="#2e1065" strokeWidth="2.5" />
+              <circle cx="150" cy="110" r="14" fill="white" stroke="#2e1065" strokeWidth="3" />
+              <path d="M 150 102 A 4 4 0 0 1 156 110 A 8 8 0 0 0 142 110 A 12 12 0 0 1 160 110" fill="none" stroke="#2e1065" strokeWidth="2.5" />
             </g>
           ),
           mouth: (
-            <path d="M 112 140 Q 116 135 120 140 T 128 140" fill="none" stroke="#1e293b" strokeWidth="3" strokeLinecap="round" />
+            <path d="M 112 140 Q 116 135 120 140 T 128 140" fill="none" stroke="#2e1065" strokeWidth="3" strokeLinecap="round" />
           ),
           blush: false,
-          color: '#E9D5FF', // Pale violet
+          color: '#f5d0fe',
           scale: 'scale(1)',
-          animation: 'yusaFloat 3.5s infinite ease-in-out'
+          animation: 'yusaCuriousTilt 2.4s infinite ease-in-out',
+          sparkles: false
+        };
+      case 'CHITTER':
+        return {
+          eyes: (
+            <g>
+              <ellipse cx="90" cy="108" rx="12" ry="17" fill="#2e1065" />
+              <circle cx="93" cy="102" r="5" fill="white" />
+              <circle cx="85" cy="116" r="2.5" fill="white" />
+              <ellipse cx="150" cy="108" rx="12" ry="17" fill="#2e1065" />
+              <circle cx="153" cy="102" r="5" fill="white" />
+              <circle cx="145" cy="116" r="2.5" fill="white" />
+            </g>
+          ),
+          mouth: (
+            <path d="M 106 132 Q 120 156 134 132 Z" fill="#ec4899" stroke="#db2777" strokeWidth="2" strokeLinejoin="round" />
+          ),
+          blush: true,
+          color: '#ec4899',
+          scale: 'scale(1.06)',
+          animation: 'yusaChitter 0.85s infinite cubic-bezier(0.28, 0.84, 0.42, 1)',
+          sparkles: true
         };
       case 'NORMAL':
       default:
         return {
           eyes: (
             <g>
-              <ellipse cx="90" cy="110" rx="10" ry="14" fill="#1e293b" />
+              <ellipse cx="90" cy="110" rx="10" ry="14" fill="#2e1065" />
               <circle cx="93" cy="105" r="4" fill="white" />
-              <ellipse cx="150" cy="110" rx="10" ry="14" fill="#1e293b" />
+              <ellipse cx="150" cy="110" rx="10" ry="14" fill="#2e1065" />
               <circle cx="153" cy="105" r="4" fill="white" />
             </g>
           ),
           mouth: (
-            <path d="M 115 135 Q 120 142 125 135" fill="none" stroke="#f472b6" strokeWidth="3" strokeLinecap="round" />
+            <path d="M 115 135 Q 120 144 125 135" fill="none" stroke="#ec4899" strokeWidth="3.5" strokeLinecap="round" />
           ),
           blush: true,
-          color: '#D4D4D8', // Darker soft white
+          color: '#f3e8ff',
           scale: 'scale(1)',
-          animation: 'yusaFloat 4s infinite ease-in-out'
+          animation: 'yusaFloat 3.5s infinite ease-in-out',
+          sparkles: false
         };
     }
   }, [mood]);
@@ -320,18 +344,14 @@ export default function YusaCompanion({ mood }) {
           position: 'absolute',
           inset: '-18px',
           borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(192,132,252,0.18) 0%, rgba(244,114,182,0.08) 50%, transparent 75%)',
+          background: 'rgba(252, 231, 243, 0.45)',
+          border: '1px solid rgba(244, 114, 182, 0.2)',
           animation: 'yusaGlow 5s infinite ease-in-out',
           pointerEvents: 'none',
         }} />
 
         <div style={{ animation: visualState.animation, width: svgSize, height: svgSize, position: 'relative' }}>
-          <Yusa3D color={visualState.color} />
-          <svg viewBox="0 0 240 240" width="100%" height="100%" style={{ position: 'absolute', inset: 0, zIndex: 2, overflow: 'visible' }}>
-            {visualState.eyes}
-            {visualState.blush && (<g style={{ opacity: 0.5 }}><ellipse cx="65" cy="125" rx="12" ry="6" fill="#f472b6" /><ellipse cx="175" cy="125" rx="12" ry="6" fill="#f472b6" /></g>)}
-            {visualState.mouth}
-          </svg>
+          <Yusa3D color={visualState.color} mood={mood} />
         </div>
       </div>
     );
@@ -395,7 +415,7 @@ export default function YusaCompanion({ mood }) {
         width: `${glowSize}px`,
         height: `${glowSize}px`,
         borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(192,132,252,0.18) 0%, rgba(244,114,182,0.10) 38%, transparent 70%)',
+        background: 'rgba(252, 231, 243, 0.5)',
         animation: 'yusaGlow 6s infinite ease-in-out',
         pointerEvents: 'none',
       }} />
@@ -424,17 +444,7 @@ export default function YusaCompanion({ mood }) {
         position: 'relative',
         zIndex: 2,
       }}>
-        <Yusa3D color={visualState.color} />
-        <svg viewBox="0 0 240 240" width="100%" height="100%" style={{ position: 'absolute', inset: 0, zIndex: 2, overflow: 'visible' }}>
-          {visualState.eyes}
-          {visualState.blush && (
-            <g style={{ opacity: 0.5 }}>
-              <ellipse cx="65" cy="125" rx="12" ry="6" fill="#f472b6" />
-              <ellipse cx="175" cy="125" rx="12" ry="6" fill="#f472b6" />
-            </g>
-          )}
-          {visualState.mouth}
-        </svg>
+        <Yusa3D color={visualState.color} mood={mood} />
       </div>
 
 

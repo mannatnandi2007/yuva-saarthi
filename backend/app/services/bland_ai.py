@@ -19,26 +19,47 @@ logger = logging.getLogger(__name__)
 BLAND_AI_API_URL = "https://api.bland.ai/v1/calls"
 
 
-def build_crisis_call_task(contact_name: str, relationship: str, user_phone: Optional[str] = None) -> str:
-    """Build empathetic conversational instructions for the Bland AI voice agent."""
-    user_label = f"the user associated with phone {user_phone}" if user_phone else "your family member / loved one"
+def build_crisis_call_task(
+    contact_name: str, 
+    relationship: str, 
+    designation: Optional[str] = None,
+    user_phone: Optional[str] = None,
+    user_name: Optional[str] = None,
+    escalation_reason: str = "acute distress / high anxiety",
+) -> str:
+    """
+    Build empathetic yet firm, clear instructions for Bland AI voice agent.
+    Task 7 requirements:
+    - Quickly introduces itself.
+    - Speaks clearly about the situation.
+    - Properly addresses guardian as per designation given by user.
+    - Warns guardian that this is NOT a mock call but an actual emergency.
+    """
+    user_label = user_name or (f"the young person registered with phone {user_phone}" if user_phone else "your child / student in your care")
+    guardian_title = designation or relationship or "Guardian"
+
     return (
-        f"You are calling on behalf of YUVAA Saarthi, an AI-powered youth well-being and safety companion. "
-        f"You are speaking with {contact_name} ({relationship}), who is listed as a primary safety contact for {user_label}. "
-        f"Tone guidelines: Remain extremely calm, respectful, supportive, and clear. Avoid causing sudden panic. "
-        f"1. Explain that our safety system registered signs of emotional crisis or acute distress during a conversation. "
-        f"2. Request that they gently check in on them with care and open-ended support. "
-        f"3. Share that national 24/7 mental health helplines are available if needed: KIRAN at 1800-599-0019 and Tele-MANAS at 14416. "
-        f"4. Reassure them and ask if they have noted the contact information before concluding the call."
+        f"You are Yusa, an automated emergency voice responder calling from YUVAA Saarthi, India's youth safety and mental well-being companion. "
+        f"You are directly speaking with {contact_name}, who is officially designated as {guardian_title} for {user_label}. "
+        f"\nCRITICAL DIRECTIVES:\n"
+        f"1. IMMEDIATE INTRODUCTION & REAL-EMERGENCY WARNING: Introduce yourself quickly and clearly state: "
+        f"'Hello {contact_name}. This is Yusa calling from YUVAA Saarthi. Please pay close attention: this is NOT a simulation, test, or mock call. This is an actual, real-time safety alert.'\n"
+        f"2. SITUATION BRIEF: Clearly and calmly explain that our verified safety monitoring detected an escalation involving {escalation_reason} during {user_label}'s current session.\n"
+        f"3. URGENT CALL TO ACTION: Request that as their designated {guardian_title}, they immediately check in on {user_label} in person or by phone with warmth, patience, and non-judgmental care.\n"
+        f"4. HELPLINE SUPPORT: Inform them that certified national 24/7 mental health emergency helplines are active right now: Tele-MANAS at 14416 and KIRAN at 1800-599-0019.\n"
+        f"5. CONVERSATION PROTOCOL: Speak in a calm, authoritative, reassuring, and articulate voice. Ask if they have heard and understood the message, and confirm they are able to check on them immediately."
     )
 
 
 def trigger_bland_ai_call(
     phone_number: str,
     contact_name: str = "Emergency Contact",
-    relationship: str = "Parent",
+    relationship: str = "Guardian",
+    designation: Optional[str] = None,
     user_id: str = "unknown",
     user_phone: Optional[str] = None,
+    user_name: Optional[str] = None,
+    escalation_reason: str = "acute distress / high anxiety",
     priority_order: int = 1,
     pathway_id: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -51,9 +72,19 @@ def trigger_bland_ai_call(
     api_key = settings.bland_ai_key or os.environ.get("BLAND_AI_KEY")
     is_live_key = api_key and not api_key.startswith("your-") and not api_key.startswith("placeholder")
 
-    task_prompt = build_crisis_call_task(contact_name, relationship, user_phone)
+    guardian_title = designation or relationship or "Guardian"
+    user_label = user_name or "your loved one"
+
+    task_prompt = build_crisis_call_task(
+        contact_name=contact_name, 
+        relationship=relationship, 
+        designation=guardian_title,
+        user_phone=user_phone, 
+        user_name=user_name,
+        escalation_reason=escalation_reason
+    )
     first_sentence = (
-        f"Hello {contact_name}, this is an automated safety alert from YUVAA Saarthi regarding your loved one."
+        f"Hello {contact_name}, this is Yusa from YUVAA Saarthi. Please listen carefully: this is NOT a mock call, but an actual urgent safety alert regarding {user_label}."
     )
 
     payload = {
@@ -67,6 +98,8 @@ def trigger_bland_ai_call(
             "user_id": user_id,
             "priority_order": priority_order,
             "relationship": relationship,
+            "designation": guardian_title,
+            "escalation_reason": escalation_reason,
             "service": "yuvaa_saarthi_escalation"
         }
     }
@@ -165,24 +198,12 @@ def trigger_sequential_escalation(
     severity: str = "high",
     contacts: Optional[List[Dict[str, Any]]] = None,
     stop_on_first_answer: bool = True,
+    escalation_reason: Optional[str] = None,
+    user_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Phase 3: Sequential Voice Escalation Loop (Owned by Mannat).
-    Reference: PRD §3.4 & §3.4a
-
-    Workflow:
-    1. Short-circuit check for abuse (Rule §3.4a):
-       If category == 'abuse' and severity == 'high':
-         Personal contacts are STRICTLY NOT CALLED.
-         Action taken is 'routed_to_helpline'.
-    2. Fetch all emergency contacts for user_id ordered by priority_order ASC.
-       If `contacts` list is supplied directly, use them.
-    3. Loop through contacts sequentially (1 -> 2 -> 3):
-       - Dispatch Bland AI voice call to contact.
-       - Log attempt to `alert_attempts` table.
-       - If call succeeds and stop_on_first_answer is True, break loop.
-         If contact fails/unanswered, advance to next priority contact.
-    4. Return complete escalation report.
+    Reference: PRD §3.4 & §3.4a + Task 7
     """
     # 1. Critical Abuse Bypass Safeguard (§3.4a)
     if severity.lower() == "high" and category.lower() == "abuse":
@@ -204,6 +225,16 @@ def trigger_sequential_escalation(
             )
         }
 
+    # Derive escalation reason if not explicitly provided
+    resolved_reason = escalation_reason
+    if not resolved_reason:
+        if category in ("self_harm", "suicide"):
+            resolved_reason = "high-risk self-harm or acute crisis signals"
+        elif category in ("anxiety", "panic"):
+            resolved_reason = "severe acute anxiety and panic symptoms"
+        else:
+            resolved_reason = "severe emotional distress requiring immediate check-in"
+
     # 2. Fetch contacts if not provided
     contact_list = []
     if contacts:
@@ -213,7 +244,7 @@ def trigger_sequential_escalation(
             from app.supabase_client import supabase
             res = (
                 supabase.table("emergency_contacts")
-                .select("id, phone, relationship, first_name, last_name, priority_order")
+                .select("id, phone, relationship, designation, first_name, last_name, priority_order")
                 .eq("user_id", user_id)
                 .order("priority_order", desc=False)
                 .execute()
@@ -227,7 +258,8 @@ def trigger_sequential_escalation(
         contact_list = [{
             "id": str(uuid.uuid4()),
             "phone": "+919876543211",
-            "relationship": "Parent",
+            "relationship": "Guardian",
+            "designation": "Guardian",
             "first_name": "Emergency",
             "last_name": "Contact",
             "priority_order": 1,
@@ -243,20 +275,24 @@ def trigger_sequential_escalation(
     for idx, c in enumerate(sorted_contacts):
         c_id = str(c.get("id") or uuid.uuid4())
         c_phone = c.get("phone") or "+919876543211"
-        c_rel = c.get("relationship", "Parent")
+        c_rel = c.get("relationship", "Guardian")
+        c_desig = c.get("designation") or c_rel or "Designated Guardian"
         c_name = f"{c.get('first_name', '')} {c.get('last_name', '')}".strip() or c.get("name") or "Emergency Contact"
         c_priority = c.get("priority_order", idx + 1)
 
         logger.info(
             "[SEQUENTIAL LOOP] Dialing Priority #%d: %s (%s, %s)",
-            c_priority, c_name, c_rel, c_phone
+            c_priority, c_name, c_desig, c_phone
         )
 
         call_result = trigger_bland_ai_call(
             phone_number=c_phone,
             contact_name=c_name,
             relationship=c_rel,
+            designation=c_desig,
             user_id=user_id,
+            user_name=user_name,
+            escalation_reason=resolved_reason,
             priority_order=c_priority,
         )
         call_dispatched = True

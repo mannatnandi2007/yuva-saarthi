@@ -91,7 +91,7 @@ export default function OtpVerification({ userSession, onVerify, onNavigate }) {
           <button 
             type="submit" 
             disabled={loading || otp.length < 6}
-            className="gradient-btn"
+            className="hallmark-btn-primary"
             style={{ 
               padding: '14px', 
               borderRadius: '8px', 

@@ -130,7 +130,7 @@ export default function Consent({ userSession, onAccept, onNavigate, hasReadPoli
 
           <div style={{ textAlign: 'center', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
             <span style={{ fontSize: '0.78rem', color: isUnlocked ? 'var(--accent-cyan)' : 'var(--text-muted)', fontWeight: '600' }}>
-              {isUnlocked ? "✓ Policy review complete. Checkboxes unlocked below." : "↓ Scroll to the bottom of this box to unlock checkboxes."}
+              {isUnlocked ? "Policy review complete. Checkboxes unlocked below." : "Scroll to the bottom of this box to unlock checkboxes."}
             </span>
           </div>
         </div>

@@ -274,6 +274,7 @@ def scan_and_chunk_folder(
         "prompt.txt",
         "research.docx",
         "research.doc",
+        "uirules.md",
     }
 
     for directory in search_dirs:

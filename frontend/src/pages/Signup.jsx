@@ -4,12 +4,13 @@
 import React, { useState } from 'react';
 import { User, Phone, Users, ShieldAlert, Plus, Trash2, AlertCircle, ArrowRight, Sparkles, Heart } from 'lucide-react';
 import axios from 'axios';
+import YusaSideMascot from '../components/YusaSideMascot.jsx';
 
 // BUG-010 FIX: Use VITE_API_URL env variable for production deployments (Vercel)
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-export default function Signup({ onComplete, onNavigate }) {
-  const [isLoginMode, setIsLoginMode] = useState(false);
+export default function Signup({ onComplete, onNavigate, initialMode = 'signup', onBackToLanding = null, hideSideMascot = false }) {
+  const [isLoginMode, setIsLoginMode] = useState(initialMode === 'login');
   const [loginUsername, setLoginUsername] = useState('');
 
   // Sign up state - phone stores pure 10 digits
@@ -172,37 +173,100 @@ export default function Signup({ onComplete, onNavigate }) {
   };
 
   return (
-    <div style={{ width: '100%', maxWidth: '560px', margin: 'auto' }} className="animate-slideup">
-      <div className="glass-panel" style={{ padding: '36px 32px', position: 'relative', overflow: 'hidden' }}>
-        
-        {/* Subtle decorative glow */}
+    <div 
+      style={{ 
+        width: '100%', 
+        maxWidth: hideSideMascot ? '520px' : '1020px', 
+        margin: 'auto',
+        display: 'grid',
+        gridTemplateColumns: hideSideMascot ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))',
+        gap: '36px',
+        alignItems: 'center',
+        padding: '16px 0'
+      }} 
+      className="animate-slideup"
+    >
+      {/* ── JUMPING & CHITTERING YUSA AT THE SIDE ── */}
+      {!hideSideMascot && (
         <div style={{
-          position: 'absolute',
-          top: '-80px',
-          right: '-80px',
-          width: '200px',
-          height: '200px',
-          background: 'radial-gradient(circle, rgba(168, 85, 247, 0.15) 0%, transparent 70%)',
-          pointerEvents: 'none'
-        }} />
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+          gap: '16px',
+          padding: '24px 16px',
+          background: '#ffffff',
+          borderRadius: '28px',
+          border: '1.5px solid rgba(236, 72, 153, 0.25)',
+          boxShadow: '0 8px 30px rgba(168, 85, 247, 0.08)'
+        }}>
+          {onBackToLanding && (
+            <button
+              type="button"
+              onClick={onBackToLanding}
+              style={{
+                background: '#fdf2f8',
+                border: '1px solid #fbcfe8',
+                color: '#db2777',
+                padding: '6px 14px',
+                borderRadius: '9999px',
+                fontSize: '0.78rem',
+                fontWeight: '700',
+                cursor: 'pointer',
+                marginBottom: '4px'
+              }}
+            >
+              ← Back to Overview
+            </button>
+          )}
+          <YusaSideMascot size={210} />
+          
+          <div style={{ maxWidth: '320px' }}>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: '800', color: '#2e1065', marginBottom: '8px' }}>
+              {isLoginMode ? "Welcome Back to YUVAA!" : "Say Hi to Yusa ✨"}
+            </h2>
+            <p style={{ fontSize: '0.9rem', color: '#581c87', lineHeight: '1.55' }}>
+              {isLoginMode 
+                ? "Your safe space is ready. Enter your username and let's pick up where we left off." 
+                : "Yusa is jumping with excitement to meet you! Everything you share stays confidential and safe."}
+            </p>
+          </div>
+
+          {/* Reassuring micro-badges */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginTop: '4px' }}>
+            <span style={{ fontSize: '0.74rem', background: '#fce7f3', color: '#be185d', padding: '4px 12px', borderRadius: '9999px', fontWeight: '700' }}>
+              🔒 100% Private
+            </span>
+            <span style={{ fontSize: '0.74rem', background: '#f3e8ff', color: '#7e22ce', padding: '4px 12px', borderRadius: '9999px', fontWeight: '700' }}>
+              💬 Hinglish Friendly
+            </span>
+            <span style={{ fontSize: '0.74rem', background: '#fce7f3', color: '#be185d', padding: '4px 12px', borderRadius: '9999px', fontWeight: '700' }}>
+              ✨ Zero Judgment
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ── LOGIN & SIGNUP CARD ── */}
+      <div className="glass-panel" style={{ padding: '36px 32px', position: 'relative', overflow: 'hidden', background: '#ffffff', border: '1.5px solid #f3e8ff' }}>
 
         {/* Card Header */}
         <div style={{ marginBottom: '22px' }}>
-          <h2 style={{ fontSize: '1.45rem', fontWeight: '800', letterSpacing: '-0.02em', marginBottom: '6px', color: 'var(--text-primary)' }}>
+          <h2 style={{ fontSize: '1.45rem', fontWeight: '800', letterSpacing: '-0.02em', marginBottom: '6px', color: '#2e1065' }}>
             {isLoginMode ? "Welcome Back" : "Create Safe Account"}
           </h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', lineHeight: '1.4' }}>
+          <p style={{ color: '#581c87', fontSize: '0.86rem', lineHeight: '1.4' }}>
             {isLoginMode 
               ? "Sign in with your unique username to resume your confidential conversations."
               : "Set up your youth profile and trusted emergency safety contacts."}
           </p>
         </div>
 
-        {/* Segmented Tab Switcher */}
+        {/* Segmented Tab Switcher (Pink & Purple Palette) */}
         <div style={{
           display: 'flex',
-          background: 'rgba(0, 0, 0, 0.04)',
-          border: '1px solid rgba(0, 0, 0, 0.05)',
+          background: 'rgba(168, 85, 247, 0.08)',
+          border: '1px solid rgba(168, 85, 247, 0.15)',
           borderRadius: '12px',
           padding: '4px',
           marginBottom: '24px'
@@ -215,12 +279,12 @@ export default function Signup({ onComplete, onNavigate }) {
               padding: '9px 14px',
               borderRadius: '9px',
               border: 'none',
-              background: !isLoginMode ? 'linear-gradient(135deg, var(--accent-blue), var(--accent-sapphire))' : 'transparent',
-              color: !isLoginMode ? '#ffffff' : 'var(--text-secondary)',
+              background: !isLoginMode ? '#db2777' : 'transparent',
+              color: !isLoginMode ? '#ffffff' : '#581c87',
               fontSize: '0.86rem',
-              fontWeight: '600',
+              fontWeight: '700',
               cursor: 'pointer',
-              boxShadow: !isLoginMode ? '0 2px 8px rgba(59, 130, 246, 0.35)' : 'none',
+              boxShadow: !isLoginMode ? '0 2px 8px rgba(219, 39, 119, 0.35)' : 'none',
               transition: 'all 0.2s ease'
             }}
           >
@@ -234,12 +298,12 @@ export default function Signup({ onComplete, onNavigate }) {
               padding: '9px 14px',
               borderRadius: '9px',
               border: 'none',
-              background: isLoginMode ? 'linear-gradient(135deg, var(--accent-blue), var(--accent-sapphire))' : 'transparent',
-              color: isLoginMode ? '#ffffff' : 'var(--text-secondary)',
+              background: isLoginMode ? '#db2777' : 'transparent',
+              color: isLoginMode ? '#ffffff' : '#581c87',
               fontSize: '0.86rem',
-              fontWeight: '600',
+              fontWeight: '700',
               cursor: 'pointer',
-              boxShadow: isLoginMode ? '0 2px 8px rgba(59, 130, 246, 0.35)' : 'none',
+              boxShadow: isLoginMode ? '0 2px 8px rgba(219, 39, 119, 0.35)' : 'none',
               transition: 'all 0.2s ease'
             }}
           >
@@ -309,10 +373,10 @@ export default function Signup({ onComplete, onNavigate }) {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="btn-primary"
-              style={{ width: '100%', padding: '13px', fontSize: '0.95rem' }}
+              className="hallmark-btn-primary"
+              style={{ width: '100%', padding: '14px', fontSize: '0.98rem' }}
             >
-              <span>{isSubmitting ? "Opening Workspace..." : "Open Safe Space"}</span>
+              <span>{isSubmitting ? "Opening Safe Space..." : "Open Safe Space"}</span>
               <ArrowRight size={17} />
             </button>
           </form>
@@ -636,12 +700,12 @@ export default function Signup({ onComplete, onNavigate }) {
 
                     {matchesUser && (
                       <div style={{ color: '#f87171', fontSize: '0.74rem', fontWeight: '500' }}>
-                        ⚠️ Cannot be your own phone number.
+                        Cannot be your own phone number.
                       </div>
                     )}
                     {isDuplicate && (
                       <div style={{ color: '#f87171', fontSize: '0.74rem', fontWeight: '500' }}>
-                        ⚠️ Duplicate contact phone number.
+                        Duplicate contact phone number.
                       </div>
                     )}
                   </div>
@@ -653,8 +717,8 @@ export default function Signup({ onComplete, onNavigate }) {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="btn-primary"
-              style={{ width: '100%', padding: '14px', fontSize: '0.95rem' }}
+              className="hallmark-btn-primary"
+              style={{ width: '100%', padding: '14px', fontSize: '0.98rem' }}
             >
               <span>{isSubmitting ? "Creating Profile..." : "Continue to Safe Space"}</span>
               <ArrowRight size={17} />

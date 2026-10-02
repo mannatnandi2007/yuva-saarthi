@@ -1,5 +1,5 @@
 # YUVAA Saarthi — Prototype Project Report
-> **As of:** September 9, 2026 | **Version:** 1.1.0 | **Repository:** `mannatnandi2007/yuvva-saarthi`
+> **As of:** October 2, 2026 | **Version:** 1.3.0 | **Repository:** `mannatnandi2007/yuvva-saarthi`
 
 ---
 
@@ -10,15 +10,16 @@
 4. [Database Schema](#4-database-schema)
 5. [API Endpoints Reference](#5-api-endpoints-reference)
 6. [Feature Implementation Status](#6-feature-implementation-status)
-7. [User Workflow](#7-user-workflow)
-8. [System Workflow (Technical)](#8-system-workflow-technical)
-9. [Implementation Process Phase-by-Phase](#9-implementation-process-phase-by-phase)
-10. [Known Bugs Fixed](#10-known-bugs-fixed)
-11. [Pending Features & Incomplete Tasks](#11-pending-features--incomplete-tasks)
-12. [Testing Coverage](#12-testing-coverage)
-13. [Deployment Configuration](#13-deployment-configuration)
-14. [Local Development Setup](#14-local-development-setup)
-15. [Security Considerations](#15-security-considerations)
+7. [NLP Mood Detection & Yusa Mapping](#7-nlp-mood-detection--yusa-mapping)
+8. [User Workflow](#8-user-workflow)
+9. [System Workflow (Technical)](#9-system-workflow-technical)
+10. [Implementation Process Phase-by-Phase](#10-implementation-process-phase-by-phase)
+11. [Known Bugs Fixed](#11-known-bugs-fixed)
+12. [Pending Features & Incomplete Tasks](#12-pending-features--incomplete-tasks)
+13. [Testing Coverage](#13-testing-coverage)
+14. [Deployment Configuration](#14-deployment-configuration)
+15. [Local Development Setup](#15-local-development-setup)
+16. [Security Considerations](#16-security-considerations)
 
 ---
 
@@ -243,7 +244,7 @@ The prototype was built in a compressed **7-day sprint (August 14-20, 2026)** by
 
 ## 6. Feature Implementation Status
 
-### Fully Implemented (28 Features)
+### Fully Implemented (30 Features)
 
 | # | Feature | Details |
 |:---|:---|:---|
@@ -275,6 +276,8 @@ The prototype was built in a compressed **7-day sprint (August 14-20, 2026)** by
 | 26 | **61-Test Automated Suite** | Covers: auth, session CRUD, chat pipeline, risk classification, escalation loop, cross-login context, false positive guard |
 | 27 | **Batch Launch Scripts** | `run.bat` — single-click launcher for both backend (port 8000) and frontend (port 5173) |
 | 28 | **Supabase Schema Migrations** | 4 migration files: initial schema, missing columns, pgvector dimension change (1536 -> 384), master consolidated |
+| 29 | **NLP Mood Detection Engine** | Client-side dictionary-based NLP system scanning last 3 user messages across 10 mood categories (English + Hinglish). Includes negation handling, priority-based mood arbitration, and ~300 bilingual phrases. See [§7](#7-nlp-mood-detection--yusa-mapping) for full details. |
+| 30 | **Yusa Visual Mood Mapping** | Real-time mapping of all 10 detected moods to distinct Yusa mascot visual states — unique body color, SVG facial expression (eyes, mouth, brows), blush toggle, animation speed/type, and contextual speech bubble per mood. |
 
 ---
 
@@ -297,7 +300,105 @@ The prototype was built in a compressed **7-day sprint (August 14-20, 2026)** by
 
 ---
 
-## 7. User Workflow
+## 7. NLP Mood Detection & Yusa Mapping
+
+YUVAA Saarthi implements a client-side NLP mood detection engine that scans user messages in real-time and maps the detected emotional state to the Yusa companion mascot's visual appearance. This system runs entirely in the browser (`Chat.jsx`) with zero backend latency, providing immediate emotional feedback.
+
+### 7.1 Detection Architecture
+
+The mood detection pipeline (`detectMood()` in `Chat.jsx`) follows a 4-stage process:
+
+```
+User sends a message
+  |
+  +--[Stage 1]-- Extract last 3 user messages (most recent first)
+  |
+  +--[Stage 2]-- Text normalization: lowercase, strip punctuation, collapse whitespace
+  |
+  +--[Stage 3]-- Dictionary phrase matching (10 mood categories × ~30 phrases each)
+  |              For each matched phrase:
+  |                → Check negation context (20-char prefix window)
+  |                → Apply priority-based arbitration (VERY_SCARED=5, distress=4, ...)
+  |                → Highest-priority non-negated match wins
+  |
+  +--[Stage 4]-- Return detected mood → passed as prop to <YusaCompanion mood={...} />
+```
+
+### 7.2 Supported Mood Categories & Bilingual Dictionaries
+
+Each mood category contains ~25-50 bilingual phrases covering both English and Hinglish (Hindi in Roman script), curated for Indian teen conversational patterns.
+
+| # | Mood | Priority | Sample English Phrases | Sample Hinglish Phrases | Total Phrases |
+|:---|:---|:---|:---|:---|:---|
+| 1 | **VERY_SCARED** | 5 (Critical) | `suicide`, `kill myself`, `want to die`, `end my life`, `self-harm` | — | ~13 |
+| 2 | **ANXIOUS** | 4 (High) | `anxious`, `panic`, `overthinking`, `can't calm down`, `my mind won't stop` | `tension mein hoon`, `ghabrahat`, `dimag ruk nahi raha`, `chain nahi hai` | ~48 |
+| 3 | **SCARED** | 4 (High) | `scared`, `terrified`, `don't feel safe`, `afraid` | `dar lag raha hai`, `darr gaya`, `safe feel nahi ho raha` | ~26 |
+| 4 | **SAD** | 4 (High) | `sad`, `crying`, `heartbroken`, `depressed`, `empty` | `dukhi`, `udaas`, `rona aa raha hai`, `dil toot gaya`, `mood off hai` | ~46 |
+| 5 | **ANGRY** | 4 (High) | `angry`, `furious`, `frustrated`, `rage`, `fed up` | `gussa`, `dimag kharab`, `pak gaya hoon`, `chidh raha hoon` | ~37 |
+| 6 | **LONELY** | 4 (High) | `lonely`, `isolated`, `nobody cares`, `i have nobody` | `akela`, `koi nahi hai`, `koi samajhta nahi`, `baat karne wala koi nahi` | ~29 |
+| 7 | **CONFUSED** | 4 (High) | `confused`, `overwhelmed`, `can't decide`, `stuck`, `lost` | `samajh nahi aa raha`, `handle nahi ho raha`, `dimag overload ho gaya` | ~37 |
+| 8 | **TIRED** | 3 (Medium) | `tired`, `exhausted`, `drained`, `burnt out`, `no energy` | `thak gaya`, `energy nahi hai`, `dimag thak gaya`, `drained hoon` | ~33 |
+| 9 | **OVERJOYED** | 2 (Positive) | `overjoyed`, `ecstatic`, `thrilled`, `best day ever` | `bahut zyada khush`, `dil garden garden`, `aaj toh kamaal ho gaya` | ~28 |
+| 10 | **HAPPY** | 2 (Positive) | `happy`, `excited`, `amazing`, `feeling good` | `khush`, `mast`, `sab badhiya`, `maza aa raha hai`, `sukoon hai` | ~48 |
+| 11 | **NORMAL** | 1 (Default) | `okay`, `fine`, `alright`, `calm` | `theek hoon`, `chill hoon`, `koi problem nahi` | ~32 |
+
+**Total: ~377 bilingual mood phrases across 11 categories.**
+
+### 7.3 Negation Handling
+
+The system checks for negation prefixes within a 20-character window before each matched phrase to prevent false mood assignments:
+
+```
+Negation tokens: 'not', "don't", 'dont', "doesn't", 'doesnt', 'never',
+                 'no longer', 'not feeling', "don't feel", 'dont feel'
+
+Example:
+  "I'm not sad"        → 'sad' is negated → does NOT trigger SAD
+  "I'm sad"            → 'sad' is not negated → triggers SAD
+  "I don't feel happy" → 'happy' is negated → does NOT trigger HAPPY
+```
+
+### 7.4 Priority-Based Mood Arbitration
+
+When multiple mood signals appear in a single message, the highest-priority mood wins:
+
+| Priority Level | Moods | Rationale |
+|:---|:---|:---|
+| **5 — Critical** | VERY_SCARED | Immediate crisis (suicidal ideation) overrides all other moods |
+| **4 — High** | ANXIOUS, SCARED, SAD, ANGRY, LONELY, CONFUSED | Distress-class emotions take precedence over positive/neutral signals |
+| **3 — Medium** | TIRED | Fatigue is notable but less urgent than active distress |
+| **2 — Positive** | OVERJOYED, HAPPY | Positive signals are captured when no distress is present |
+| **1 — Default** | NORMAL | Fallback when no mood signal is detected |
+
+### 7.5 Yusa Visual Mood Mapping
+
+Each detected mood maps to a distinct Yusa visual state, creating an ambient emotional mirror in the chat UI:
+
+| Mood | Yusa Body Color | Facial Expression | Blush | Animation | Speech Bubble |
+|:---|:---|:---|:---|:---|:---|
+| **NORMAL** | `#D4D4D8` Soft white | Gentle oval eyes, small smile | ✅ | Float 4s | "I'm here with you 💜" |
+| **HAPPY** | `#FDE047` Soft yellow | Bright round eyes with highlights, curved smile | ✅ | Float 3s | "Love to see you smile! 💜" |
+| **OVERJOYED** | `#FBBF24` Warm golden | Crescent happy-arc eyes, wide open-mouth grin | ✅ | Float 2s (fast) | "You're glowing! ✨" |
+| **SAD** | `#93C5FD` Light blue | Drooped brows, small round eyes, inverted frown | ❌ | None (still) | "I'm here for you 💙" |
+| **ANGRY** | `#ea580c` Fiery orange | Thick V-shaped brows, dark round eyes, deep frown | ❌ | None (still) | "Take a deep breath 🌿" |
+| **ANXIOUS** | `#FDBA74` Soft orange | Small worried eyes, raised brows, wavy mouth | ❌ | Float 1.5s (fast) | "We'll get through this 💜" |
+| **SCARED** | `#CBD5E1` Pale gray-blue | Wide eyes with tiny pupils, raised brows, blue sweat drop, open 'O' mouth | ❌ | Float 1s (rapid) | "You are safe here 🛡️" |
+| **VERY_SCARED** | Gradient (crisis) | Wide terrified white eyes, tiny pupils, raised brows, screaming oval mouth | ❌ | Float 0.3s (trembling) | — (crisis mode) |
+| **LONELY** | `#C4B5FD` Soft purple | Drooped brows, small sad eyes, flat line mouth | ❌ | Float 4s (slow) | "I'm right here with you 🫂" |
+| **TIRED** | `#D6D3D1` Warm grey | Closed drooping eyes (curved lines), small yawn mouth | ✅ | Float 5s (very slow) | "Rest is important 🌙" |
+| **CONFUSED** | `#E9D5FF` Pale violet | Spiral/rolling eyes, wavy squiggle mouth | ❌ | Float 3.5s | "Let's take it one step at a time 🧩" |
+
+### 7.6 Design Principles
+
+- **Zero-latency feedback**: Mood detection runs client-side with no network calls, providing instant visual response as the user types.
+- **Recency bias**: The system prioritizes the most recent message; it only falls back to older messages if the latest has no detectable mood.
+- **Cultural sensitivity**: Dictionaries are curated for Indian teen conversational patterns, including Hinglish code-switching, exam stress hyperbole, and colloquial emotional expressions.
+- **Non-clinical communication**: Yusa never displays clinical labels. Emotional state is conveyed through expressive character design — colors, facial expressions, animation tempo, and warm speech bubbles — to maintain a safe, non-judgemental atmosphere.
+- **Responsive scaling**: Yusa renders at 180px (desktop), 150px (tablet), and 90px (mobile) to ensure presence without obstructing the chat UI.
+
+---
+
+## 8. User Workflow
 
 ```
 NEW USER JOURNEY
@@ -323,6 +424,7 @@ NEW USER JOURNEY
     Click any session to resume, or click "+" for a new session
     Type message in Hinglish, Hindi, or English
     AI responds empathetically, grounded in clinical guidelines
+    Yusa mascot reacts in real-time to detected mood (NLP mood detection)
     If distress detected     -> supportive, warm, non-robotic response
     If self-harm detected    -> KIRAN / Tele-MANAS + background Bland AI call
     If abuse detected        -> Childline 1098; NO personal contacts called (Rule 3.4a)
@@ -340,12 +442,13 @@ RETURNING USER JOURNEY
 [1] Open App -> Auto-logged in from localStorage session
 [2] Previous sessions listed with AI headings, newest first
 [3] Click any session to resume with full psychological context
-[4] Or click logout to return to signup
+[4] Yusa mood updates with each new message based on NLP mood detection
+[5] Or click logout to return to signup
 ```
 
 ---
 
-## 8. System Workflow (Technical)
+## 9. System Workflow (Technical)
 
 ### Per-Message Pipeline: POST /chat
 
@@ -391,6 +494,20 @@ Client --> POST /chat  {session_id, message}
   |              new rolling summary -> chat heading derived -> saved to sessions
   |
   +--> RESPONSE: {reply, risk_classification, action_taken, heading, session_id}
+
+
+Client-side (after response received):
+  |
+  +--[Step 9]-- NLP Mood Detection (Chat.jsx, runs entirely in browser)
+  |              detectMood(messages) scans last 3 user messages
+  |              Dictionary phrase match → negation check → priority arbitration
+  |              Returns: NORMAL | HAPPY | OVERJOYED | SAD | ANGRY | ANXIOUS |
+  |                       SCARED | VERY_SCARED | LONELY | TIRED | CONFUSED
+  |
+  +--[Step 10]- Yusa Visual State Update
+  |              <YusaCompanion mood={currentMood} />
+  |              Maps detected mood → body color, facial SVG, animation, speech bubble
+  |              Zero-latency (no network call), instant visual feedback
 ```
 
 ### Bland AI Escalation Loop
@@ -422,7 +539,7 @@ generate_rolling_summary(existing_summary, user_message, assistant_reply)
 
 ---
 
-## 9. Implementation Process Phase-by-Phase
+## 10. Implementation Process Phase-by-Phase
 
 ### Phase 1: Setup & Auth — Aug 14-15 — COMPLETE
 - FastAPI + React + Vite project skeleton scaffolded
@@ -461,7 +578,7 @@ generate_rolling_summary(existing_summary, user_message, assistant_reply)
 - Batch launch scripts created (`run.bat`, `start.bat`)
 - **Missed:** Yashika's formal test conversation sets, cloud deployment
 
-### Post-Sprint Improvements — Aug 21 through Sep 9
+### Post-Sprint Improvements — Aug 21 through Oct 2
 - Dynamic crisis guidance system (replaced all hardcoded canned crisis replies)
 - Gemini quota circuit breaker (`trip_gemini_cooldown`)
 - Multi-session sidebar with AI-generated headings
@@ -473,10 +590,23 @@ generate_rolling_summary(existing_summary, user_message, assistant_reply)
 - Supabase pgvector `search_supabase_rag()` function (Aakansha, Sep 8)
 - Master consolidated schema migration
 - Auth improvements: username uniqueness check order, transient session UUID error resilience
+- **NLP Mood Detection Engine** — Client-side dictionary-based NLP system with ~377 bilingual (English + Hinglish) phrases across 10 mood categories, negation handling, and priority-based arbitration (`Chat.jsx`)
+- **Yusa Visual Mood Mapping** — Full 11-state visual mapping from detected mood to Yusa mascot appearance: distinct body colors, SVG facial expressions (eyes, brows, mouth), blush toggles, animation speeds, and contextual speech bubbles (`YusaCompanion.jsx`)
+- **Yusa 3D Rendering** — CSS 3D-styled Modak character with mood-reactive color and crisis trembling effect (`Yusa3D.jsx`)
+- **PWA Installation & Offline Support (Task 1)** — Web App Manifest (`manifest.json`), service worker (`sw.js`) with cache fallback, standalone display mode, and responsive SVG icons.
+- **Dynamic Environment & Emotional Animation (Task 2)** — Real-time reactive environment shifts (`.dynamic-env`, `.env-happy`, `.env-sad`, `.env-angry`, `.env-anxious`, `.env-tired`) with jumping & wiggling Yusa (`@keyframes yusaJumpWiggle`), gloomy dimmed mist for sadness, and 4-second breathing cues for panic.
+- **Hallmark & SATQuery Standard (Tasks 3 & 4)** — Eradication of 20 banned AI generator patterns (`docs/UIrules.md`), strict 8-state interactive buttons, 4-pt/8-pt spacing tokens, Roman-only headings, and tabular numerals.
+- **Youth-Centric Non-Technical Landing Page (Task 5)** — Empathetic, relatable landing experience addressing board exam stress, family pressure, and loneliness, with 3 easy steps and interactive FAQ (`LandingPage.jsx`).
+- **LangChain Anti-Generic Engine (Task 6)** — Eradicated robotic cliches ("take a deep breath", "sab theek ho jayega"). Implemented active listening topic mirroring and dynamic Hinglish/English contextual fallbacks (`llm_service.py`).
+- **Bland AI Auto-Calling Escalation (Task 7)** — Auto-dialing on self-harm OR high anxiety/panic detection; agent introduces itself as Yusa, addresses guardian by user-designated relationship, and issues an explicit emergency warning stating this is not a mock call (`bland_ai.py`, `chat_service.py`).
+- **User-Friendly Clean UI (Task 8)** — Removed technical tags ("Rule §3.4a Active", "Neural Engine", etc.) and added 0.6s cubic-bezier smooth mood transitions.
+- **Pink & Purple Design Palette (Task 9)** — Curated pink & purple palette system across cards, buttons, tabs, Yusa emotions, and dynamic ambient glows.
+- **Smooth Navigation Transitions (Task 10)** — Animated router transitions (`pageFadeSlideIn`) for seamless shifts between Landing, Auth, Chat, and Policies.
+- **Jumping & Chittering Yusa Companion (Task 11)** — Interactive animated companion on Login/Signup pages (`YusaSideMascot.jsx`) with playful bouncing, speech bubbles, and tap reactions.
 
 ---
 
-## 10. Known Bugs Fixed
+## 11. Known Bugs Fixed
 
 | Bug ID | Description | Fix Applied |
 |:---|:---|:---|
@@ -494,7 +624,7 @@ generate_rolling_summary(existing_summary, user_message, assistant_reply)
 
 ---
 
-## 11. Pending Features & Incomplete Tasks
+## 12. Pending Features & Incomplete Tasks
 
 ### Active Focus Sprint — In Progress (Phase 6)
 
@@ -531,7 +661,7 @@ generate_rolling_summary(existing_summary, user_message, assistant_reply)
 
 ---
 
-## 12. Testing Coverage
+## 13. Testing Coverage
 
 ### Automated — pytest 9.1
 
@@ -554,7 +684,7 @@ generate_rolling_summary(existing_summary, user_message, assistant_reply)
 
 ---
 
-## 13. Deployment Configuration
+## 14. Deployment Configuration
 
 ### Frontend
 - **Framework:** Vite + React 18
@@ -590,7 +720,7 @@ DEV_BYPASS_AUTH=false
 
 ---
 
-## 14. Local Development Setup
+## 15. Local Development Setup
 
 ```powershell
 # 1. Clone
@@ -612,14 +742,17 @@ npm install
 
 # 4. Launch both (Windows - single command)
 cd ..
-.\run.bat
+.\start.bat      # Or .\run.bat
+
+# 5. RAG Document Ingestion (Optional / Re-indexing)
+.\ingest_rag.bat # Ingests/re-ingests all clinical PDFs in docs\rag_documents\ into Supabase
 # Backend:  http://localhost:8000/docs  (Swagger UI)
 # Frontend: http://localhost:5173
 ```
 
 ---
 
-## 15. Security Considerations
+## 16. Security Considerations
 
 | Area | Current State | Production Requirement |
 |:---|:---|:---|
@@ -636,4 +769,4 @@ cd ..
 
 ---
 
-*Report generated by Antigravity IDE — September 9, 2026*
+*Report generated by Antigravity IDE — October 2, 2026*

@@ -1,141 +1,231 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Environment, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 
-const BlobMesh = ({ color }) => {
+/**
+ * Yusa3D — True 3D Modak Character plotted entirely in Three.js
+ * Features:
+ * - 100% Three.js 3D geometry (body, Modak peak, 3D eyes with specular gleams, 3D blush, 3D smile/frown, 3D sparkle stars)
+ * - Window-level cursor tilt tracking (eyes, smile, and head rotate together in authentic 3D perspective)
+ * - Safe camera distance (z = 4.4, fov = 38) to guarantee zero edge/corner viewport clipping
+ * - Smooth Three.js transparent ground shadow circle with zero WebGL bounding-box artifacts
+ * - Solid vibrant colors only (no gradients)
+ */
+function YusaModel({ color = '#f472b6', mood = 'HAPPY' }) {
   const groupRef = useRef();
-  
-  // Create a shared material with custom shader injection for the gradient
-  const material = useMemo(() => {
-    const mat = new THREE.MeshStandardMaterial({
-      roughness: 0.4,
-      metalness: 0.15,
-      color: '#E2E2E5'
-    });
-    
-    mat.onBeforeCompile = (shader) => {
-      shader.uniforms.bboxMin = { value: -0.8 };
-      shader.uniforms.bboxMax = { value: 1.0 };
-      shader.uniforms.colorTop = { value: new THREE.Color('#3b82f6') }; // Blue
-      shader.uniforms.colorMid = { value: new THREE.Color('#94a3b8') }; // Grey
-      shader.uniforms.colorBottom = { value: new THREE.Color('#fde047') }; // Yellow
-      shader.uniforms.gradientMix = { value: 0.0 }; // 0 = solid, 1 = gradient
+  const leftStarRef = useRef();
+  const rightStarRef = useRef();
+  const mouthRef = useRef();
+  const mousePos = useRef({ x: 0, y: 0 });
 
-      shader.vertexShader = `
-        varying vec3 vWorldPosition;
-        ${shader.vertexShader}
-      `.replace(
-        `#include <worldpos_vertex>`,
-        `
-        #include <worldpos_vertex>
-        vWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
-        `
-      );
-
-      shader.fragmentShader = `
-        uniform vec3 colorTop;
-        uniform vec3 colorMid;
-        uniform vec3 colorBottom;
-        uniform float bboxMin;
-        uniform float bboxMax;
-        uniform float gradientMix;
-        varying vec3 vWorldPosition;
-        ${shader.fragmentShader}
-      `.replace(
-        `vec4 diffuseColor = vec4( diffuse, opacity );`,
-        `
-        float y = clamp((vWorldPosition.y - bboxMin) / (bboxMax - bboxMin), 0.0, 1.0);
-        vec3 gradColor;
-        if (y < 0.5) {
-            gradColor = mix(colorBottom, colorMid, y * 2.0);
-        } else {
-            gradColor = mix(colorMid, colorTop, (y - 0.5) * 2.0);
-        }
-        vec3 finalColor = mix(diffuse, gradColor, gradientMix);
-        vec4 diffuseColor = vec4( finalColor, opacity );
-        `
-      );
-      
-      mat.userData.shader = shader;
+  // Window cursor listener for interactive 3D perspective tracking
+  useEffect(() => {
+    const handlePointerMove = (e) => {
+      mousePos.current.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mousePos.current.y = -(e.clientY / window.innerHeight) * 2 + 1;
     };
-    return mat;
+    window.addEventListener('pointermove', handlePointerMove);
+    return () => window.removeEventListener('pointermove', handlePointerMove);
   }, []);
 
-  // Determine if we are in the VERY_SCARED (gradient) mood
-  const isCrisis = color && color.includes('url');
-  const targetSolidColor = new THREE.Color(isCrisis ? '#FFFFFF' : (color || '#E2E2E5'));
+  const targetColor = useMemo(() => new THREE.Color(color || '#f472b6'), [color]);
 
-  useFrame((state, delta) => {
-    // 1. Smoothly transition the base color
-    material.color.lerp(targetSolidColor, 0.05);
-    
-    // 2. Smoothly fade in/out the shader gradient
-    if (material.userData.shader) {
-      const targetMix = isCrisis ? 1.0 : 0.0;
-      const currentMix = material.userData.shader.uniforms.gradientMix.value;
-      material.userData.shader.uniforms.gradientMix.value = currentMix + (targetMix - currentMix) * 0.05;
+  // Materials
+  const bodyMaterial = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      color: targetColor,
+      roughness: 0.32,
+      metalness: 0.05,
+    });
+  }, [targetColor]);
+
+  const eyeMaterial = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      color: new THREE.Color('#2e1065'), // Deep plum
+      roughness: 0.15,
+      metalness: 0.12,
+    });
+  }, []);
+
+  const gleamMaterial = useMemo(() => {
+    return new THREE.MeshBasicMaterial({
+      color: new THREE.Color('#ffffff'),
+    });
+  }, []);
+
+  const blushMaterial = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      color: new THREE.Color('#f472b6'),
+      roughness: 0.6,
+      transparent: true,
+      opacity: 0.85,
+    });
+  }, []);
+
+  const mouthMaterial = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      color: new THREE.Color('#be185d'),
+      roughness: 0.3,
+      metalness: 0.05,
+    });
+  }, []);
+
+  const starMaterial = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      color: new THREE.Color('#c084fc'),
+      roughness: 0.25,
+      metalness: 0.2,
+      emissive: new THREE.Color('#9333ea'),
+      emissiveIntensity: 0.35,
+    });
+  }, []);
+
+  const isSad = mood === 'SAD' || mood === 'TIRED';
+  const isAnxious = mood === 'ANXIOUS' || mood === 'SCARED' || mood === 'VERY_SCARED';
+
+  useFrame((state) => {
+    if (bodyMaterial) {
+      bodyMaterial.color.lerp(targetColor, 0.08);
     }
-    
-    // 3. Breathing effect and subtle rotation
+
     if (groupRef.current) {
       const t = state.clock.getElapsedTime();
-      const scaleBase = 1.35; // Match the visual size of the previous SVG
-      const breath = Math.sin(t * 2) * 0.015;
-      
-      // Much faster trembling if in crisis mood
-      const tremble = isCrisis ? Math.sin(t * 20) * 0.02 : 0;
-      
-      groupRef.current.scale.set(scaleBase + breath, scaleBase - breath * 0.5, scaleBase + breath);
-      groupRef.current.position.x = tremble;
-      groupRef.current.rotation.y = Math.sin(t * 0.5) * 0.08;
-      groupRef.current.rotation.z = Math.cos(t * 0.7) * 0.04;
+      const breath = Math.sin(t * 2.4) * 0.016;
+
+      // Subtle cheerful idle chitter/wiggle in 3D space
+      const idleWiggle = Math.sin(t * 3.6) * 0.05;
+      const idleBounce = Math.abs(Math.sin(t * 3.2)) * 0.035;
+
+      // Cursor tilt combined with gentle organic breathing and wiggle
+      const targetRotY = (mousePos.current.x * 0.34) + idleWiggle;
+      const targetRotX = (-mousePos.current.y * 0.20) + Math.cos(t * 0.7) * 0.02;
+      const targetRotZ = idleWiggle * 0.5;
+
+      groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetRotY, 0.08);
+      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, targetRotX, 0.08);
+      groupRef.current.rotation.z = THREE.MathUtils.lerp(groupRef.current.rotation.z, targetRotZ, 0.08);
+
+      // Gentle floating bob + joyful micro-bounce
+      groupRef.current.position.y = -0.02 + Math.sin(t * 2.2) * 0.032 + idleBounce;
+
+      const baseScale = 0.88;
+      groupRef.current.scale.set(baseScale + breath, baseScale - breath * 0.5, baseScale + breath);
+    }
+
+    // Sparkles spin
+    if (leftStarRef.current && rightStarRef.current) {
+      const t = state.clock.getElapsedTime();
+      leftStarRef.current.rotation.z = t * 0.8;
+      rightStarRef.current.rotation.z = -t * 0.7;
+    }
+
+    // Mood mouth expression lerp
+    if (mouthRef.current) {
+      const targetMouthRotX = isSad ? Math.PI * 0.08 : (isAnxious ? Math.PI * 0.5 : Math.PI * 0.94);
+      const targetMouthPosY = isSad ? -0.19 : -0.14;
+      mouthRef.current.rotation.x = THREE.MathUtils.lerp(mouthRef.current.rotation.x, targetMouthRotX, 0.1);
+      mouthRef.current.position.y = THREE.MathUtils.lerp(mouthRef.current.position.y, targetMouthPosY, 0.1);
     }
   });
 
   return (
-    <group ref={groupRef} position={[0, -0.05, 0]}>
-      {/* Main wide blob body (squashed Bao/Modak shape) */}
-      <mesh material={material} scale={[1.15, 0.85, 0.7]}>
+    <group ref={groupRef} position={[0, -0.02, 0]}>
+      {/* 1. Main squashed Bao / Modak body */}
+      <mesh material={bodyMaterial} scale={[1.12, 0.86, 0.76]}>
         <sphereGeometry args={[1, 64, 64]} />
       </mesh>
-      
-      {/* Left top bump */}
-      <mesh material={material} position={[-0.22, 0.75, 0]} scale={[1, 0.9, 0.8]}>
-        <sphereGeometry args={[0.22, 32, 32]} />
+
+      {/* 2. Signature Modak crest tip */}
+      <mesh material={bodyMaterial} position={[0, 0.76, 0]} scale={[0.42, 0.44, 0.34]}>
+        <coneGeometry args={[0.5, 0.88, 32]} />
       </mesh>
-      
-      {/* Right top bump */}
-      <mesh material={material} position={[0.22, 0.75, 0]} scale={[1, 0.9, 0.8]}>
-        <sphereGeometry args={[0.22, 32, 32]} />
+
+      {/* 3. Left and Right top cheek bumps */}
+      <mesh material={bodyMaterial} position={[-0.24, 0.68, 0]} scale={[1, 0.86, 0.78]}>
+        <sphereGeometry args={[0.2, 32, 32]} />
+      </mesh>
+      <mesh material={bodyMaterial} position={[0.24, 0.68, 0]} scale={[1, 0.86, 0.78]}>
+        <sphereGeometry args={[0.2, 32, 32]} />
+      </mesh>
+
+      {/* 4. Left 3D Eye with specular gleams */}
+      <group position={[-0.29, 0.08, 0.67]} rotation={[0, -0.14, 0]}>
+        {/* Eye Base */}
+        <mesh material={eyeMaterial} scale={[0.13, 0.18, 0.06]}>
+          <sphereGeometry args={[1, 32, 32]} />
+        </mesh>
+        {/* Main upper gleam */}
+        <mesh material={gleamMaterial} position={[0.038, 0.065, 0.05]} scale={[0.045, 0.05, 0.02]}>
+          <sphereGeometry args={[1, 16, 16]} />
+        </mesh>
+        {/* Secondary lower gleam */}
+        <mesh material={gleamMaterial} position={[-0.038, -0.045, 0.05]} scale={[0.025, 0.028, 0.015]}>
+          <sphereGeometry args={[1, 16, 16]} />
+        </mesh>
+      </group>
+
+      {/* 5. Right 3D Eye with specular gleams */}
+      <group position={[0.29, 0.08, 0.67]} rotation={[0, 0.14, 0]}>
+        {/* Eye Base */}
+        <mesh material={eyeMaterial} scale={[0.13, 0.18, 0.06]}>
+          <sphereGeometry args={[1, 32, 32]} />
+        </mesh>
+        {/* Main upper gleam */}
+        <mesh material={gleamMaterial} position={[0.038, 0.065, 0.05]} scale={[0.045, 0.05, 0.02]}>
+          <sphereGeometry args={[1, 16, 16]} />
+        </mesh>
+        {/* Secondary lower gleam */}
+        <mesh material={gleamMaterial} position={[-0.038, -0.045, 0.05]} scale={[0.025, 0.028, 0.015]}>
+          <sphereGeometry args={[1, 16, 16]} />
+        </mesh>
+      </group>
+
+      {/* 6. 3D Rosy Cheeks (Blush) */}
+      <mesh material={blushMaterial} position={[-0.48, -0.06, 0.58]} scale={[0.14, 0.075, 0.04]}>
+        <sphereGeometry args={[1, 32, 32]} />
+      </mesh>
+      <mesh material={blushMaterial} position={[0.48, -0.06, 0.58]} scale={[0.14, 0.075, 0.04]}>
+        <sphereGeometry args={[1, 32, 32]} />
+      </mesh>
+
+      {/* 7. 3D Happy/Responsive Modak Smile */}
+      <mesh ref={mouthRef} material={mouthMaterial} position={[0, -0.14, 0.69]} rotation={[Math.PI * 0.94, 0, 0]} scale={[0.15, 0.11, 0.05]}>
+        <torusGeometry args={[0.48, 0.18, 16, 32, Math.PI]} />
+      </mesh>
+
+      {/* 8. 3D Floating Sparkle Stars */}
+      <mesh ref={leftStarRef} material={starMaterial} position={[-0.78, 0.38, 0.22]} scale={[0.075, 0.075, 0.04]}>
+        <octahedronGeometry args={[1, 0]} />
+      </mesh>
+      <mesh ref={rightStarRef} material={starMaterial} position={[0.78, 0.42, 0.20]} scale={[0.07, 0.07, 0.04]}>
+        <octahedronGeometry args={[1, 0]} />
+      </mesh>
+
+      {/* 9. Soft Circular Ground Shadow (No clipping or box artifacts) */}
+      <mesh position={[0, -0.92, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[1.1, 0.72, 1]}>
+        <circleGeometry args={[0.82, 48]} />
+        <meshBasicMaterial color="#db2777" transparent opacity={0.15} depthWrite={false} />
       </mesh>
     </group>
   );
-};
+}
 
-export default function Yusa3D({ color }) {
+export default function Yusa3D({ color = '#ec4899', mood = 'HAPPY' }) {
   return (
-    <div style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none' }}>
-      <Canvas shadows camera={{ position: [0, 0, 4.5], fov: 45 }} gl={{ alpha: true }}>
-        <ambientLight intensity={0.7} />
-        {/* Soft directional lighting for depth */}
-        <directionalLight position={[5, 5, 5]} intensity={0.7} castShadow />
-        <directionalLight position={[-5, -2, -5]} intensity={0.3} color="#f472b6" />
-        <directionalLight position={[0, 5, -5]} intensity={0.2} color="#818cf8" />
-        
-        <BlobMesh color={color} />
-        
-        {/* Subtle contact/drop shadow underneath */}
-        <ContactShadows 
-          position={[0, -1.3, 0]} 
-          opacity={0.35} 
-          scale={4} 
-          blur={2.5} 
-          far={3}
-          color="#1e293b" 
-        />
-        
-        <Environment preset="city" />
+    <div style={{ width: '100%', height: '100%', position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none' }}>
+      <Canvas 
+        camera={{ position: [0, 0, 4.4], fov: 38 }} 
+        gl={{ alpha: true, antialias: true, premultipliedAlpha: false }}
+        style={{ width: '100%', height: '100%', background: 'transparent' }}
+      >
+        <ambientLight intensity={0.9} />
+        {/* Soft directional lighting for rich 3D shading */}
+        <directionalLight position={[4, 5, 4]} intensity={1.15} />
+        <directionalLight position={[-4, -1, 3]} intensity={0.45} color="#f472b6" />
+        <directionalLight position={[0, 4, -4]} intensity={0.3} color="#a855f7" />
+
+        {/* 100% Three.js Plotted Yusa Model */}
+        <YusaModel color={color} mood={mood} />
       </Canvas>
     </div>
   );

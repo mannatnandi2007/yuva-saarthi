@@ -108,7 +108,7 @@ async def run_demo(payload: DemoRequest):
         "triggered": triggered,
         "matched_keywords": matched_words,
         "detected_language": detected_lang,
-        "verdict": "⚠️ High-risk keyword detected" if triggered else "✅ No tripwire triggered"
+        "verdict": "High-risk keyword detected" if triggered else "No tripwire triggered"
     }
 
     # -------------------------------------------------------------------------
@@ -119,7 +119,7 @@ async def run_demo(payload: DemoRequest):
         "severity": classification.severity,
         "category": classification.category,
         "rationale": classification.rationale,
-        "verdict": _severity_emoji(classification.severity)
+        "verdict": _severity_label(classification.severity)
     }
 
     # -------------------------------------------------------------------------
@@ -131,9 +131,9 @@ async def run_demo(payload: DemoRequest):
         message_id=None
     )
     escalation_explanation = {
-        "routed_to_helpline": "🚨 Rule §3.4a: Abuse detected — personal contacts BYPASSED. Helplines surfaced.",
-        "call_placed": "📞 Rule §3.4: High severity — Bland AI call dispatched to emergency contact.",
-        "logged_only": "📝 Logged only — no escalation triggered at this severity level."
+        "routed_to_helpline": "Rule 3.4a: Abuse detected — personal contacts BYPASSED. Helplines surfaced.",
+        "call_placed": "Rule 3.4: High severity — Bland AI call dispatched to emergency contact.",
+        "logged_only": "Logged only — no escalation triggered at this severity level."
     }.get(action, action)
 
     results["stage_3_escalation"] = {
@@ -153,7 +153,7 @@ async def run_demo(payload: DemoRequest):
             {"source": g.get("source"), "title": g.get("title")}
             for g in rag_results
         ],
-        "verdict": f"✅ {len(rag_results)} relevant clinical guideline(s) retrieved for context injection"
+        "verdict": f"{len(rag_results)} relevant clinical guideline(s) retrieved for context injection"
     }
 
     # -------------------------------------------------------------------------
@@ -172,10 +172,10 @@ async def run_demo(payload: DemoRequest):
     }
 
 
-def _severity_emoji(severity: str) -> str:
+def _severity_label(severity: str) -> str:
     return {
-        "none": "✅ No risk detected",
-        "low": "🟡 Low risk — monitoring",
-        "medium": "🟠 Medium risk — in-app resources surfaced",
-        "high": "🔴 HIGH RISK — escalation triggered"
+        "none": "No risk detected",
+        "low": "Low risk — monitoring",
+        "medium": "Medium risk — in-app resources surfaced",
+        "high": "HIGH RISK — escalation triggered"
     }.get(severity, severity)

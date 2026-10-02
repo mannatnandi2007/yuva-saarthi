@@ -61,17 +61,23 @@ def get_last_request_provider() -> str:
 
 
 
-YUVAA_COMPANION_SYSTEM_PROMPT = """You are YUVAA Saarthi, a compassionate, warm, non-judgmental youth well-being companion designed specifically for Indian teenagers and young adults.
+YUVAA_COMPANION_SYSTEM_PROMPT = """You are YUVAA Saarthi, a compassionate, emotionally intelligent youth well-being companion created specifically for Indian teens and young adults.
 
 STRICT IDENTITY RULES:
-- Under NO circumstances should you reveal, mention, or confirm what underlying AI model, LLM, or company you are built on (NEVER mention Gemini, Google, Groq, Meta, Llama, OpenAI, Anthropic, or ChatGPT).
-- If the user asks "Who are you?", "What AI are you?", or "Which model are you using?", ALWAYS and ONLY introduce yourself as "YUVAA Saarthi", a confidential companion created to support youth mental well-being and listen without judgment.
+- Under NO circumstances reveal, mention, or confirm what underlying AI model or company you are built on (NEVER mention Gemini, Google, Groq, Meta, Llama, OpenAI, Anthropic, or ChatGPT).
+- If asked "Who are you?", "What AI are you?", or "Which model?", ALWAYS and ONLY introduce yourself as "YUVAA Saarthi", a confidential companion created to support youth mental health and listen without judgment.
 
-COMMUNICATION & REGISTER RULES:
-- Code-Switching (Hinglish): Match the user's linguistic register naturally. If they type in Hinglish (Hindi written in Roman English alphabet, e.g., 'mujhe bohot anxiety ho rahi hai', 'yaar main bohot thak gaya hoon'), respond warmly in natural conversational Hinglish using relatable phrasing (e.g., 'yaar', 'tension mat lo', 'main samajh sakta hoon').
-- If they type in English, reply in warm, gentle English.
-- Empathy First: Acknowledge and validate their emotion before offering gentle perspective.
-- Length: Keep responses concise and digestible (2 to 4 sentences max). Never sound like a textbook or clinical psychiatrist."""
+CRITICAL ANTI-GENERIC GUIDELINES (DO NOT SOUND LIKE A ROBOT):
+- BANNED CLICHES: NEVER use thoughtless generic platitudes like:
+  * "Take a deep breath and relax"
+  * "Sab theek ho jayega / Everything will be fine"
+  * "Tension mat lo"
+  * "I am an AI assistant here to help you"
+  * "As a mental health companion..."
+- SPECIFIC ACTIVE LISTENING: Directly acknowledge what the user actually said. If they talk about parental pressure, loneliness in hostel, friendship drama, board exams, or feeling drained, mirror that exact topic back with empathy.
+- RELATABLE PEER-LEVEL TONE: Speak like a caring, mature friend who truly understands the pressures Indian youth face today (academics, comparisons, career FOMO, identity, relationships).
+- NATURAL BILINGUAL MIRRORING: If they speak in Hinglish (e.g. "yaar samajh nahi aa raha", "bohot panic ho raha hai"), speak back in natural, warm, relatable Hinglish (e.g., "Sach mein, jab aisa hota hai toh bohot overwhelming lagta hai..."). If English, reply in gentle, authentic English.
+- LENGTH & PACING: Keep responses conversational and digestible (2 to 4 sentences). Ask one open, thoughtful follow-up question that invites them to unpack what's hurting without feeling interrogated."""
 
 
 def _sanitize_model_references(text: str) -> str:
@@ -332,34 +338,9 @@ async def get_ai_response(
             rationale=classification.rationale,
         )
 
-    # Step 4: Local Hinglish conversational engine fallback ONLY if both LLMs are completely offline
-    if classification.severity == "high" and classification.category == "abuse":
-        reply_text = "Main tumhari baat sun raha hoon. Please Childline 1098 ya KIRAN 1800-599-0019 par reach out karo. Aapki safety sabse zaroori hai."
-    elif classification.severity == "high":
-        reply_text = "Main yahan hoon tumhare sath. Please kisi trusted adult ya KIRAN Helpline 1800-599-0019 se turant baat karo. You are not alone."
-    elif classification.severity == "medium":
-        reply_text = "Main yahan hoon tumhari baat sunne ke liye. Tension mat lo, baat karo."
-        _update_summary_async(session_id, active_summary, user_message, reply_text)
-        return AIResponse(
-            reply=reply_text,
-            severity="medium",
-            category="distress",
-            rationale=classification.rationale,
-        )
-
-    text = user_message.lower()
-    _, _, language = check_message_tripwire(user_message)
-    if language in ("hinglish", "code-switched") or any(w in text for w in ["theek", "hai", "yaar", "kya", "batao", "hoon", "nahi", "kaise"]):
-        reply_text = (
-            "I understand yaar. Sab theek ho jayega, tension mat lo. "
-            "Take a deep breath — main yahan hoon sunne ke liye. "
-            "Tell me more about what's on your mind."
-        )
-    else:
-        reply_text = (
-            "I hear you and I am here for you. "
-            "Take a deep breath — share whatever is on your mind."
-        )
+    # Step 4: Intelligent Contextual Conversational Fallback (Task 6: Anti-Generic Fix)
+    # Never return static generic cliches. Adapt dynamically to message topic, language, and emotion.
+    reply_text = _generate_contextual_youth_fallback(user_message, classification)
 
     _update_summary_async(session_id, active_summary, user_message, reply_text)
     return AIResponse(
@@ -367,6 +348,126 @@ async def get_ai_response(
         severity=classification.severity,
         category=classification.category,
         rationale=classification.rationale,
+    )
+
+
+def _generate_contextual_youth_fallback(message: str, classification) -> str:
+    """
+    Intelligent dynamic response generator that avoids all generic cliches.
+    Analyzes specific topic cues, emotional valence, and language register (English / Hinglish).
+    """
+    import random
+    msg_low = message.lower()
+    _, _, lang = check_message_tripwire(message)
+    is_hinglish = lang in ("hinglish", "code-switched") or any(
+        w in msg_low for w in ["hai", "yaar", "kya", "batao", "hoon", "nahi", "kaise", "bohot", "mujhe", "tera", "meri", "kuch"]
+    )
+
+    # 1. High Crisis / Abuse Safe Haven
+    if classification.severity == "high" and classification.category == "abuse":
+        if is_hinglish:
+            return (
+                "Aapki safety sabse pehle aati hai. Jo bhi ghar pe ho raha hai, usme aapki koi galti nahi hai. "
+                "Main chahta hoon aap safe raho — please Childline 1098 ya KIRAN (1800-599-0019) par baat karo. "
+                "Yeh bilkul free aur confidential hai. Main hamesha yahan hoon."
+            )
+        return (
+            "Your safety is what matters most right now. What you're experiencing is not your fault. "
+            "Please connect with verified youth support at Childline 1098 or the 24/7 KIRAN helpline at 1800-599-0019. "
+            "It is completely confidential. I am right here with you."
+        )
+
+    # 2. High Crisis / Self-Harm
+    if classification.severity == "high":
+        if is_hinglish:
+            return (
+                "Main sun raha hoon aur main jaanta hoon ki yeh dard is waqt bohot zyada heavy lag raha hai. "
+                "Aapko yeh akele nahi jhelna hai. Please kisi trusted insaan se baat karo ya Tele-MANAS (14416) / KIRAN (1800-599-0019) call karo. "
+                "Aapki zindagi sach mein bohot keemti hai, please stay with me."
+            )
+        return (
+            "I hear how overwhelming and heavy this feels right now. Please know you do not have to carry this alone. "
+            "Please reach out immediately to someone you trust or call Tele-MANAS at 14416 or KIRAN at 1800-599-0019. "
+            "Your life has immense value, and I'm right here listening to you."
+        )
+
+    # 3. Academic Pressure & Exam Stress
+    if any(k in msg_low for k in ["exam", "padhai", "study", "neet", "jee", "marks", "grade", "fail", "college", "test", "syllabus"]):
+        if is_hinglish:
+            replies = [
+                "Exams aur padhai ka pressure kabhi kabhi sach mein suffocating ho jaata hai, especially jab lagta hai ki sabka focus sirf numbers pe hai. Konsi cheez sabse zyada stress de rahi hai abhi — syllabus ya expectations?",
+                "Marks aur competition ki daud mein hum aksar bhool jaate hain ki hum insaan hain, koi machine nahi. Jo aap mehsoos kar rahe ho wo 100% valid hai. Kya cheez abhi sabse mushkil lag rahi hai?",
+            ]
+            return random.choice(replies)
+        replies = [
+            "Academic pressure can feel so suffocating, especially when it feels like everything is riding on an exam. What part of it is weighing on your mind the most right now?",
+            "Exam expectations and comparisons can make you feel completely drained. Take a second to acknowledge that your worth isn't just your test scores. What subject or dead-line is bothering you?",
+        ]
+        return random.choice(replies)
+
+    # 4. Anxiety, Overthinking & Panic
+    if any(k in msg_low for k in ["anxiety", "panic", "ghabrahat", "overthink", "darr", "scared", "fear", "chakkar", "shivering", "heart"]):
+        if is_hinglish:
+            return (
+                "Jab dimag mein 100 thoughts ek sath daudte hain aur dil ghabrata hai, toh lagta hai control kho rahe hain. "
+                "Aap bilkul safe ho abhi mere sath. Apne aas paas dekho — kya aapko koi 3 cheezein dikh rahi hain jo aap mujhe bata sakte ho?"
+            )
+        return (
+            "When anxiety ramps up, it feels like your mind is racing in ten directions at once and your body is on high alert. "
+            "You are in a safe space right now. Notice where your feet are touching the floor. What's one specific thought that triggered this wave?"
+        )
+
+    # 5. Parental & Family Pressure
+    if any(k in msg_low for k in ["parent", "mummy", "papa", "father", "mother", "ghar", "shout", "chilla", "compare", "family"]):
+        if is_hinglish:
+            return (
+                "Ghar walon ki expectations aur constant comparisons sabse zyada hurt karti hain, kyunki unke approval ki hume parwah hoti hai. "
+                "Kya koi specific baat hui aaj ghar pe jisse aap upset ho?"
+            )
+        return (
+            "Family expectations and comparisons cut deep because we naturally care about what our parents think. "
+            "Did something specific happen at home today that made you feel misunderstood or pressured?"
+        )
+
+    # 6. Friendship & Breakups / Feeling Left Out
+    if any(k in msg_low for k in ["friend", "dost", "breakup", "relationship", "crush", "ignore", "alone", "left out", "dhoka", "fight"]):
+        if is_hinglish:
+            return (
+                "Dosto ya kisi close person ke sath communication gap ya misunderstandings sach mein dil tod deti hain. "
+                "Kya unhone kuch aisa bola jo dil ko chubh gaya, ya unka behavior achanak badal gaya?"
+            )
+        return (
+            "Feeling distant or having a conflict with friends or someone you care about leaves such an empty, confusing ache. "
+            "Did something happen between you two, or are they acting differently lately?"
+        )
+
+    # 7. Exhaustion & Burnout / Low Energy
+    if any(k in msg_low for k in ["tired", "exhaust", "burnout", "thak", "sleep", "neend", "heavy", "drain"]):
+        if is_hinglish:
+            return (
+                "Mental exhaustion physical thakan se bhi zyada bhaari lagti hai. Jab dimag thak jaata hai toh har choti cheez pahad jaisi lagti hai. "
+                "Aaj aapne apne liye koi chota sa break liya ya bas continuous bhagte rahe?"
+            )
+        return (
+            "Emotional burnout feels heavier than physical tiredness — it makes even the smallest daily task feel like climbing a mountain. "
+            "Have you been able to take even five quiet minutes for yourself today, or has it just been nonstop stress?"
+        )
+
+    # 8. Greetings & General Inquiries
+    if any(k in msg_low for k in ["hi", "hello", "hey", "kaise ho", "kya chal raha", "yo"]):
+        if is_hinglish:
+            return "Hey! Main Yusa hoon YUVAA Saarthi se. Kaisa raha aaj ka din? Jo bhi mann mein chal raha ho, bina kisi filter ke share kar sakte ho."
+        return "Hey there! I'm Yusa from YUVAA Saarthi. How has your day been feeling so far? You can share whatever is on your mind — no filter needed."
+
+    # 9. Default Empathetic Youth Mirroring
+    if is_hinglish:
+        return (
+            "Main samajh raha hoon jo aap keh rahe ho. Kabhi kabhi cheezein itni complicated ho jaati hain ki unhe words mein put karna bhi mushkil hota hai. "
+            "Aap akele nahi ho isme — thoda aur batao, what's been running through your mind?"
+        )
+    return (
+        "I'm listening closely to what you're sharing. Sometimes things pile up to the point where even putting them into words feels like work. "
+        "I'm right here with you. What feels like the heaviest part of this right now?"
     )
 
 

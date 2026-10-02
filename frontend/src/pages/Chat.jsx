@@ -307,7 +307,7 @@ export default function Chat({
       const errDetail = error.response?.data?.detail || "Could not connect to the YUVAA Saarthi server. Please make sure the backend is running.";
       setMessages(prev => [...prev, { 
         sender: 'assistant', 
-        content: `⚠️ ${errDetail}` 
+        content: errDetail 
       }]);
     } finally {
       setIsLoading(false);
@@ -535,8 +535,8 @@ export default function Chat({
                  sessionsList.find(s => s.session_id === activeSessionId)?.title || 
                  (messages.length > 0 ? "Active Conversation" : "New Safe Chat")}
               </span>
-              <span style={{ fontSize: '0.65rem', color: '#94a3b8', letterSpacing: '0.04em', textTransform: 'uppercase', fontWeight: '500' }}>
-                Confidential Neural Companion // End-to-End Secure
+              <span style={{ fontSize: '0.68rem', color: '#a855f7', letterSpacing: '0.04em', fontWeight: '600' }}>
+                100% Confidential • Always Here for You
               </span>
             </div>
           </div>
@@ -573,10 +573,12 @@ export default function Chat({
           )}
         </header>
 
-        {/* ── CHAT VIEWPORT ── */}
-        <div className="chat-viewport" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0, background: 'linear-gradient(175deg, #FAF8FF 0%, #F8F5FF 30%, #F5F0FA 55%, #FDF2F8 80%, #FAF8FF 100%)' }}>
-          
-          {/* ── YUSA TOP SECTION ── */}
+        {/* ── CHAT VIEWPORT WITH DYNAMIC ENVIRONMENT (Task 2) ── */}
+        <div 
+          className={`chat-viewport dynamic-env env-${currentMood ? currentMood.toLowerCase() : 'normal'}`} 
+          style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}
+        >
+          {/* ── YUSA TOP SECTION WITH EMOTION ANIMATIONS ── */}
           <YusaCompanion mood={currentMood} />
 
           {/* Chat Messages — this scrolls independently */}
@@ -680,7 +682,7 @@ export default function Chat({
                   <ShieldAlert size={22} />
                   <span style={{ fontWeight: '700', fontSize: '0.95rem' }}>
                     {activeSafeguard === 'abuse_bypass' 
-                      ? 'Confidential Helpline Support Surfaced (Rule §3.4a Active)' 
+                      ? 'Confidential Helpline Support Surfaced' 
                       : 'Immediate 24/7 Crisis Support Lines'}
                   </span>
                 </div>
@@ -701,7 +703,7 @@ export default function Chat({
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '14px 18px',
-                        background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                        background: '#db2777',
                         border: 'none',
                         borderRadius: '14px',
                         color: '#ffffff',
@@ -802,7 +804,7 @@ export default function Chat({
                 height: '42px',
                 borderRadius: '50%',
                 border: 'none',
-                background: inputText.trim() && !isLoading ? 'linear-gradient(135deg, #a855f7, #ec4899)' : '#f1f5f9',
+                background: inputText.trim() && !isLoading ? '#db2777' : '#f1f5f9',
                 color: inputText.trim() && !isLoading ? '#ffffff' : '#cbd5e1',
                 cursor: inputText.trim() && !isLoading ? 'pointer' : 'default',
                 display: 'flex',

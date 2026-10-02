@@ -558,8 +558,28 @@ async def send_chat_message(
             action_taken=action_taken,
         )
 
-    # Step 7: Trigger Bland AI sequential escalation loop if high-severity non-abuse
-    if ai_result.severity == "high" and ai_result.category != "abuse":
+    # Step 7: Trigger Bland AI sequential escalation loop (Task 7)
+    # The call should be made on escalation: self-harm OR high anxiety detected (non-abuse)
+    msg_lower = message.lower()
+    is_self_harm_escalation = (ai_result.category in ("self_harm", "suicide"))
+    is_high_anxiety_escalation = (
+        (ai_result.category in ("anxiety", "panic", "distress") or ai_result.severity in ("high", "medium"))
+        and any(k in msg_lower for k in [
+            "anxiety", "panic attack", "panic", "can't breathe", "cant breathe", "breathless", 
+            "hyperventilat", "chest tight", "shivering", "trembling", "terrified", "so scared", 
+            "ghabrahat", "saans nahi", "dil ghabra", "bohot anxiety", "severe panic", "heart racing"
+        ])
+    )
+    is_general_high_escalation = (ai_result.severity == "high")
+
+    should_escalate = (is_self_harm_escalation or is_high_anxiety_escalation or is_general_high_escalation) and ai_result.category != "abuse"
+
+    if should_escalate:
+        escalation_reason = (
+            "acute self-harm danger" if is_self_harm_escalation 
+            else ("severe panic attack and high anxiety" if is_high_anxiety_escalation 
+            else "acute emotional crisis")
+        )
         try:
             import asyncio
             asyncio.create_task(
@@ -568,6 +588,7 @@ async def send_chat_message(
                     user_id=user_id,
                     category=ai_result.category,
                     risk_event_id=risk_event_id,
+                    escalation_reason=escalation_reason,
                 )
             )
         except Exception:
@@ -575,6 +596,7 @@ async def send_chat_message(
                 user_id=user_id,
                 category=ai_result.category,
                 risk_event_id=risk_event_id,
+                escalation_reason=escalation_reason,
             )
 
     # Step 8: Derive conversation heading immediately & update rolling summary asynchronously
@@ -614,7 +636,8 @@ async def send_chat_message(
 def _trigger_escalation_background(
     user_id: str,
     category: str,
-    risk_event_id: Optional[str] = None
+    risk_event_id: Optional[str] = None,
+    escalation_reason: Optional[str] = None,
 ) -> None:
     """
     Phase 3: Sequential Voice Escalation Loop across priority contacts (Mannat).
@@ -626,7 +649,8 @@ def _trigger_escalation_background(
             user_id=user_id,
             risk_event_id=risk_event_id,
             category=category,
-            severity="high"
+            severity="high",
+            escalation_reason=escalation_reason,
         )
         logger.info(
             "[BLAND AI SEQUENTIAL LOOP] Executed for user=%s total_attempts=%d",

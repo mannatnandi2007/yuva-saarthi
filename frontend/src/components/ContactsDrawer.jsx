@@ -156,9 +156,7 @@ export default function ContactsDrawer({ isOpen, onClose, contacts = [] }) {
           gap: '10px'
         }}>
           <ShieldAlert size={18} color="var(--accent-crimson)" style={{ flexShrink: 0, marginTop: '2px' }} />
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-            <strong style={{ color: 'var(--accent-crimson)' }}>Rule §3.4a Active:</strong> If family abuse or domestic violence is detected, these contacts will never be dialed.
-          </div>
+            <strong style={{ color: 'var(--accent-rose)' }}>Safe Haven Policy:</strong> If family safety or domestic concerns are detected, your contacts will never be dialed to protect your privacy and safety.
         </div>
 
       </div>
