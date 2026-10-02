@@ -1,6 +1,6 @@
 // YUVAA Saarthi Main Application Container
-// Clean Electric Blue & Obsidian Navy Theme
-// Featuring Anatomical Brain Logo, Dedicated Policies Page, Policy Modal, & Contacts Drawer
+// Calm Light Mental-Health Companion Theme
+// Featuring Brain Logo, Dedicated Policies Page, Policy Modal, & Contacts Drawer
 
 import React, { useState, useEffect } from 'react';
 import Signup from './pages/Signup.jsx';
@@ -111,76 +111,92 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)' }}>
+    <div style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)' }}>
       
       {/* Clean Uncluttered Navbar (Unnecessary tags removed) */}
       <nav style={{ 
-        background: 'var(--bg-secondary)', 
-        borderBottom: '1px solid var(--border-medium)',
-        padding: '12px 28px',
+        background: 'rgba(255, 255, 255, 0.6)', 
+        backdropFilter: 'blur(16px)',
+        borderBottom: '1px solid rgba(167, 139, 250, 0.1)',
+        padding: '10px 28px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         position: 'sticky',
         top: 0,
         zIndex: 100,
-        backdropFilter: 'blur(16px)'
       }}>
         {/* Left: Brain Logo + Clean Wordmark */}
         <div 
           onClick={() => setCurrentPage(userSession ? 'chat' : 'signup')}
           style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
         >
-          <BrainLogo size={36} />
+          <BrainLogo size={34} />
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <span style={{ 
-              fontSize: '1.25rem', 
+              fontSize: '1.2rem', 
               fontFamily: 'var(--font-display)', 
-              fontWeight: '900', 
+              fontWeight: '800', 
               letterSpacing: '-0.02em',
-              lineHeight: 1.15
-            }} className="off-register-text">
+              lineHeight: 1.15,
+              color: '#1e293b'
+            }}>
               YUVAA <span className="gradient-crimson-pink">Saarthi</span>
             </span>
-            <span className="mono-telemetry" style={{ fontSize: '0.62rem', opacity: 0.75 }}>
-              YOUTH MENTAL HEALTH COMPANION
+            <span style={{ fontSize: '0.6rem', color: '#94a3b8', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: '500' }}>
+              Youth Mental Health Companion
             </span>
           </div>
         </div>
 
         {/* Right: Clean, purposeful controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* Dedicated Safety Policies Page Trigger */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Safety Policies */}
           <button
             onClick={handleOpenPoliciesPage}
             className="hallmark-btn-secondary"
-            style={{ padding: '8px 14px', fontSize: '0.82rem', gap: '6px' }}
+            style={{ padding: '7px 14px', fontSize: '0.82rem', gap: '6px' }}
             title="View Safety & Confidentiality Policies"
           >
-            <Shield size={14} color="var(--accent-cyan)" />
+            <Shield size={14} color="#818cf8" />
             <span>Safety Policies</span>
           </button>
 
-          {/* Emergency Contacts Drawer Trigger (when logged in) */}
+          {/* Emergency Contacts */}
           {userSession && (
             <button
               onClick={() => setIsContactsOpen(true)}
               className="hallmark-btn-secondary"
-              style={{ padding: '8px 14px', fontSize: '0.82rem', gap: '6px' }}
+              style={{ padding: '7px 14px', fontSize: '0.82rem', gap: '6px' }}
               title="View Emergency Contacts"
             >
-              <Users size={14} color="var(--accent-blue)" />
+              <Users size={14} color="#818cf8" />
               <span>Contacts ({emergencyContacts.length})</span>
             </button>
           )}
 
-          {/* Logout button (when logged in) */}
+          {/* Logout */}
           {userSession && (
             <button
               onClick={handleLogout}
-              className="hallmark-btn-secondary"
-              style={{ padding: '8px 12px', fontSize: '0.82rem', color: '#f87171' }}
+              style={{
+                padding: '7px 14px',
+                fontSize: '0.82rem',
+                fontWeight: '600',
+                fontFamily: 'inherit',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'rgba(254, 242, 242, 0.8)',
+                border: '1px solid rgba(252, 165, 165, 0.5)',
+                borderRadius: '9999px',
+                color: '#ef4444',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
               title="Sign Out"
+              onMouseEnter={e => { e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.borderColor = '#fca5a5'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.borderColor = '#fecaca'; }}
             >
               <LogOut size={14} />
               <span>Sign Out</span>
@@ -190,7 +206,7 @@ export default function App() {
       </nav>
 
       {/* Main Content Workspace */}
-      <main style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+      <main style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {currentPage === 'policies' ? (
           <PoliciesPage 
             onBack={() => setCurrentPage(previousPage || (userSession ? 'chat' : 'signup'))}

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import BrainLogo from '../components/BrainLogo.jsx';
+import YusaCompanion from '../components/YusaCompanion.jsx';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -56,6 +57,77 @@ export default function Chat({
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const chatSectionRef = useRef(null);
+
+  // Mood Detection Logic
+  const detectMood = (messages) => {
+    const recentUserMsgs = messages.filter(m => m.sender === 'user').slice(-3);
+    if (recentUserMsgs.length === 0) return 'NORMAL';
+
+    const dictionaries = {
+      VERY_SCARED: ['suicide', 'kill myself', 'self harm', 'die', 'want to die', 'end my life', 'cut myself', 'don\'t want to live', 'no reason to live', 'better off dead', 'suicidal', 'self-harm', 'harm myself'],
+      HAPPY: ['happy', 'happier', 'joyful', 'glad', 'cheerful', 'excited', 'great', 'good', 'amazing', 'wonderful', 'fantastic', 'awesome', 'positive', 'peaceful', 'content', 'satisfied', 'relieved', 'feeling good', 'feeling better', 'feeling great', 'made my day', 'best day', 'so happy', 'really happy', 'pretty happy', "i'm doing good", 'things are going well', 'khush', 'bahut khush', 'bohot khush', 'aaj khush hoon', 'mann khush hai', 'dil khush hai', 'acha lag raha hai', 'accha lag raha hai', 'bahut acha lag raha hai', 'bohot acha lag raha hai', 'mast', 'ekdum mast', 'sab badhiya', 'sab badiya', 'sahi hai', 'maza aa raha hai', 'kaafi acha', 'relaxed hoon', 'sukoon hai', 'aaj mood acha hai'],
+      OVERJOYED: ['overjoyed', 'extremely happy', 'extremely excited', 'thrilled', 'ecstatic', 'delighted', 'elated', 'on top of the world', 'best day ever', 'so excited', 'super happy', 'really excited', "can't believe it", 'this is amazing', "i'm so happy", "i'm extremely happy", 'bahut zyada khush', 'bohot zyada khush', 'ekdum khush', 'bahut excited', 'bohot excited', 'aaj toh maza aa gaya', 'dil garden garden', 'aaj toh kamaal ho gaya', 'kya mast din hai', 'bahut hi acha', 'bohot hi acha', 'life mast chal rahi hai'],
+      SAD: ['sad', 'unhappy', 'upset', 'crying', 'cried', 'tears', 'hurt', 'heartbroken', 'depressed', 'miserable', 'down', 'low', 'hopeless', 'disappointed', 'broken', 'empty', 'nothing feels good', 'feel terrible', 'feel horrible', 'i feel bad', 'i feel sad', 'i want to cry', 'feeling low', 'feeling down', 'lost', 'emotionally drained', 'dukhi', 'udaas', 'bahut dukhi', 'bohot dukhi', 'mann udaas hai', 'dil udaas hai', 'rona aa raha hai', 'ro raha hoon', 'ro rahi hoon', 'aankhon mein aansu', 'dil toot gaya', 'andar se toot gaya', 'bahut bura lag raha hai', 'bohot bura lag raha hai', 'mann nahi lag raha', 'kuch acha nahi lag raha', 'akela feel ho raha hai', 'andar se khali lag raha hai', 'low feel ho raha hai', 'mood off hai'],
+      ANGRY: ['angry', 'mad', 'furious', 'annoyed', 'irritated', 'frustrated', 'rage', 'enraged', 'pissed', 'fed up', 'hate this', 'so angry', 'really angry', 'very angry', "can't control my anger", "i'm furious", 'this makes me angry', "i'm frustrated", 'gussa', 'gusse mein', 'bahut gussa', 'bohot gussa', 'gussa aa raha hai', 'gussa chadh raha hai', 'dimag kharab', 'dimag garam', 'pak gaya hoon', 'pak chuka hoon', 'irritate ho raha hoon', 'irritated hoon', 'frustrate ho gaya', 'frustrated hoon', 'bahut irritate', 'bohot irritate', 'mann kar raha hai chillane ka', 'bahut chidh ho rahi hai', 'chidh raha hoon'],
+      ANXIOUS: ['anxious', 'anxiety', 'anxious about', 'worried', 'worry', 'worrying', 'nervous', 'stressed', 'stress', 'panic', 'panicking', 'overthinking', 'restless', 'uneasy', 'tense', 'scared about the future', "can't stop thinking", "can't calm down", 'feeling stressed', 'feeling anxious', "i'm worried", "i'm nervous", "i'm panicking", "my mind won't stop", 'tension', 'tension ho rahi hai', 'tension mein hoon', 'bahut tension', 'bohot tension', 'chinta', 'chinta ho rahi hai', 'pareshan', 'bahut pareshan', 'bohot pareshan', 'ghabrahat', 'ghabra raha hoon', 'ghabrahat ho rahi hai', 'dar lag raha hai', 'overthinking ho rahi hai', 'bahut overthink kar raha hoon', 'dimag ruk nahi raha', 'dimag mein bahut kuch chal raha hai', 'chain nahi hai', 'restless hoon', 'stress ho raha hai', 'stress mein hoon'],
+      SCARED: ['scared', 'afraid', 'frightened', 'terrified', 'fear', 'fearful', 'i am scared', "i'm afraid", "i'm terrified", "i'm really scared", 'something bad will happen', "i don't feel safe", "i'm afraid of", "i'm frightened", 'dar', 'dar lag raha hai', 'bahut dar lag raha hai', 'bohot dar lag raha hai', 'darr gaya', 'darr gayi', 'bahut darr gaya', 'ghabra raha hoon', 'mujhe dar lag raha hai', 'safe feel nahi ho raha', 'mujhe khauf lag raha hai', 'bahut ghabrahat hai'],
+      LONELY: ['lonely', 'alone', 'isolated', 'nobody understands me', 'no one understands me', 'no one is there', 'i have nobody', 'i feel alone', 'i feel lonely', 'feeling isolated', 'no one cares', 'nobody cares', 'i have no friends', 'i need someone', 'i want company', 'akela', 'akeli', 'akela feel ho raha hai', 'akeli feel ho rahi hai', 'bahut akela', 'bohot akela', 'koi nahi hai', 'mere saath koi nahi hai', 'koi samajhta nahi', 'mujhe koi nahi samajhta', 'kisi se baat nahi hoti', 'baat karne wala koi nahi', 'koi care nahi karta', 'sabse door ho gaya hoon', 'bahut lonely feel ho raha hai'],
+      TIRED: ['tired', 'exhausted', 'drained', 'sleepy', 'fatigued', 'burnt out', 'burned out', 'no energy', 'low energy', "can't focus", 'mentally exhausted', 'emotionally exhausted', 'physically exhausted', 'i need rest', 'i need sleep', "i'm exhausted", "i'm so tired", 'thak gaya', 'thak gayi', 'bahut thak gaya', 'bohot thak gaya', 'thak chuka hoon', 'energy nahi hai', 'bilkul energy nahi', 'dimag thak gaya', 'mentally tired', 'bahut exhaustion hai', 'neend aa rahi hai', 'so jaana hai', 'rest chahiye', 'break chahiye', 'dimaag kaam nahi kar raha', 'bilkul drained hoon'],
+      CONFUSED: ['confused', 'confusing', "don't understand", "i don't know", "i don't know what to do", 'overwhelmed', 'too much', 'too many things', "can't handle everything", 'everything is happening at once', 'my head is full', 'my mind is overloaded', 'i feel lost', "i don't know what i'm doing", "can't decide", 'unable to decide', 'stuck', 'i feel stuck', 'confuse hoon', 'confused ho gaya', 'samajh nahi aa raha', 'kuch samajh nahi aa raha', 'kya karu samajh nahi aa raha', 'bahut kuch ho raha hai', 'sab kuch ek saath ho raha hai', 'bahut load hai', 'dimaag mein bahut load hai', 'handle nahi ho raha', 'sab handle nahi ho raha', 'kahan se start karu', 'decision nahi le paa raha', 'decision nahi le paa rahi', 'atak gaya hoon', 'stuck hoon', 'lost feel ho raha hai', 'dimag overload ho gaya'],
+      NORMAL: ['normal', 'okay', 'fine', 'alright', 'calm', 'calm down', 'peaceful', 'relaxed', 'stable', 'neutral', "i'm okay", "i'm fine", 'doing okay', 'feeling okay', 'nothing much', 'just normal', "i'm alright", 'normal hoon', 'theek hoon', 'thik hoon', 'sab theek', 'theek hai', 'kuch nahi', 'bas normal', 'shaant hoon', 'shant hoon', 'relaxed hoon', 'chill hoon', 'sab normal hai', 'theek chal raha hai', 'koi problem nahi', 'main okay hoon']
+    };
+
+    const negationPhrases = ['not', "don't", 'dont', "doesn't", 'doesnt', 'never', 'no longer', 'not feeling', "don't feel", 'dont feel'];
+
+    const priorityLevels = {
+      VERY_SCARED: 5,
+      ANXIOUS: 4, SCARED: 4, SAD: 4, ANGRY: 4, LONELY: 4, CONFUSED: 4, // HIGH
+      TIRED: 3, // MEDIUM
+      OVERJOYED: 2, HAPPY: 2, // POSITIVE
+      NORMAL: 1 // DEFAULT
+    };
+
+    const isNegated = (text, matchIndex) => {
+      if (matchIndex === 0) return false;
+      const prefix = text.substring(Math.max(0, matchIndex - 20), matchIndex);
+      return negationPhrases.some(neg => prefix.endsWith(neg + " ") || prefix.endsWith(neg));
+    };
+
+    // Always prefer the newest message. Only fallback if the newest has absolutely NO detectable mood.
+    for (let i = recentUserMsgs.length - 1; i >= 0; i--) {
+      const text = recentUserMsgs[i].content.toLowerCase().replace(/[.,!?;:]/g, ' ').replace(/\s+/g, ' ').trim();
+      
+      let messageMood = 'NORMAL';
+      let messagePriority = 0;
+      let moodFoundInMessage = false;
+
+      for (const [mood, phrases] of Object.entries(dictionaries)) {
+        const priority = priorityLevels[mood] || 1;
+
+        for (const phrase of phrases) {
+          const idx = text.indexOf(phrase);
+          if (idx !== -1) {
+            if (!isNegated(text, idx)) {
+              moodFoundInMessage = true;
+              if (priority > messagePriority) {
+                messagePriority = priority;
+                messageMood = mood;
+              }
+            }
+          }
+        }
+      }
+
+      if (moodFoundInMessage) {
+        return messageMood;
+      }
+    }
+    
+    return 'NORMAL';
+  };
+  
+  const currentMood = detectMood(messages);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -251,37 +323,38 @@ export default function Chat({
   };
 
   return (
-    <div style={{ flex: 1, display: 'flex', height: 'calc(100vh - 61px)', overflow: 'hidden', background: 'var(--bg-primary)' }}>
+    <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
       
-      {/* Hyperlane Left Sidebar */}
+      {/* Left Sidebar */}
       <aside 
         style={{
-          width: sidebarOpen ? '280px' : '0px',
-          transition: 'width 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+          width: sidebarOpen ? '250px' : '0px',
+          transition: 'width 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
           overflow: 'hidden',
-          background: 'var(--bg-secondary)',
-          borderRight: sidebarOpen ? '1px solid var(--border-medium)' : 'none',
+          background: 'rgba(255, 255, 255, 0.55)',
+          backdropFilter: 'blur(12px)',
+          borderRight: sidebarOpen ? '1px solid rgba(167, 139, 250, 0.1)' : 'none',
           display: 'flex',
           flexDirection: 'column',
           flexShrink: 0,
           zIndex: 20
         }}
       >
-        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minWidth: '280px' }}>
+        <div style={{ padding: '18px 14px', display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minWidth: '250px' }}>
           
           {/* New Chat Button */}
           <button
             onClick={createNewChat}
             className="hallmark-btn-primary"
-            style={{ width: '100%', padding: '10px 16px', fontSize: '0.86rem' }}
+            style={{ width: '100%', padding: '12px 16px', fontSize: '0.88rem', borderRadius: '14px' }}
           >
             <Plus size={16} />
             <span>New Safe Chat</span>
           </button>
 
           {/* Session History Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 6px', marginTop: '6px' }}>
-            <span className="mono-telemetry" style={{ fontSize: '0.66rem' }}>CONVERSATION LOG</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 4px', marginTop: '4px' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: '600', color: '#94a3b8', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Conversation Log</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{sessionsList.length}</span>
               {sessionsList.length > 0 && (
@@ -312,7 +385,7 @@ export default function Chat({
           </div>
 
           {/* Sessions List */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto', flex: 1 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto', flex: 1 }}>
             {sessionsList.map((s) => {
               const isActive = s.session_id === activeSessionId;
               const displayHeading = s.heading || s.title || (s.summary_snapshot ? s.summary_snapshot.replace(/^Heading:\s*/, '').slice(0, 26) + '...' : `Chat ${s.session_id.slice(0, 6)}`);
@@ -324,33 +397,40 @@ export default function Chat({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '8px 10px',
-                    borderRadius: 'var(--radius-md)',
-                    border: isActive ? '1px solid var(--border-glow)' : '1px solid transparent',
-                    background: isActive ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
-                    color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
+                    padding: '10px 12px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: isActive ? 'rgba(167, 139, 250, 0.12)' : 'transparent',
+                    color: isActive ? '#1e293b' : '#64748b',
                     cursor: 'pointer',
-                    fontSize: '0.82rem',
+                    fontSize: '0.84rem',
                     transition: 'all 0.15s ease'
                   }}
                   onMouseEnter={(e) => {
                     if (!isActive) {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
-                      e.currentTarget.style.color = 'var(--text-secondary)';
+                      e.currentTarget.style.background = 'rgba(167, 139, 250, 0.06)';
+                      e.currentTarget.style.color = '#475569';
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!isActive) {
                       e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.color = 'var(--text-muted)';
+                      e.currentTarget.style.color = '#64748b';
                     }
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1, minWidth: 0 }}>
-                    <MessageSquare size={14} color={isActive ? 'var(--accent-blue-core)' : 'var(--text-muted)'} style={{ flexShrink: 0 }} />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: isActive ? '600' : '400' }}>
-                      {displayHeading}
-                    </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden', flex: 1, minWidth: 0 }}>
+                    <MessageSquare size={15} color={isActive ? '#818cf8' : '#94a3b8'} style={{ flexShrink: 0 }} />
+                    <div style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: isActive ? '600' : '400', display: 'block' }}>
+                        {displayHeading}
+                      </span>
+                      {s.started_at && (
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block', marginTop: '2px' }}>
+                          {new Date(s.started_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <button
                     onClick={(e) => handleDeleteSession(s.session_id, e)}
@@ -385,23 +465,27 @@ export default function Chat({
           </div>
 
           {/* Sidebar Footer Controls */}
-          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ borderTop: '1px solid rgba(167, 139, 250, 0.08)', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <button
               onClick={onOpenContacts}
-              className="hallmark-btn-secondary"
-              style={{ width: '100%', justifyContent: 'flex-start', padding: '8px 12px', fontSize: '0.8rem' }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'flex-start', padding: '10px 12px', fontSize: '0.82rem', background: 'transparent', border: 'none', borderRadius: '12px', cursor: 'pointer', color: '#64748b', transition: 'all 0.15s ease', fontFamily: 'inherit' }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
-              <Users size={14} color="var(--accent-pink)" />
+              <Users size={15} color="#818cf8" />
               <span>Safety Network ({emergencyContacts.length})</span>
+              <span style={{ marginLeft: 'auto', color: '#cbd5e1' }}>›</span>
             </button>
 
             <button
               onClick={onOpenPolicy}
-              className="hallmark-btn-secondary"
-              style={{ width: '100%', justifyContent: 'flex-start', padding: '8px 12px', fontSize: '0.8rem' }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'flex-start', padding: '10px 12px', fontSize: '0.82rem', background: 'transparent', border: 'none', borderRadius: '12px', cursor: 'pointer', color: '#64748b', transition: 'all 0.15s ease', fontFamily: 'inherit' }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
-              <Shield size={14} color="var(--accent-crimson)" />
+              <Shield size={15} color="#a78bfa" />
               <span>Safety Charter & Protocol</span>
+              <span style={{ marginLeft: 'auto', color: '#cbd5e1' }}>›</span>
             </button>
           </div>
 
@@ -409,29 +493,29 @@ export default function Chat({
       </aside>
 
       {/* Main Chat Stream Container */}
-      <section style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+      <section ref={chatSectionRef} style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden', minWidth: 0, minHeight: 0 }}>
         
-        {/* Top Header Bar with Active Chat Heading & Controls */}
+        {/* Chat Header */}
         <header style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '10px 18px',
-          borderBottom: '1px solid var(--border-subtle)',
-          background: 'rgba(5, 9, 20, 0.75)',
+          padding: '10px 22px',
+          borderBottom: '1px solid rgba(167, 139, 250, 0.08)',
+          background: 'rgba(255, 255, 255, 0.5)',
           backdropFilter: 'blur(12px)',
           zIndex: 10,
           flexShrink: 0
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               style={{
-                background: 'var(--bg-secondary)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: '8px',
-                color: 'var(--text-muted)',
-                padding: '6px',
+                background: 'rgba(255, 255, 255, 0.6)',
+                border: '1px solid rgba(167, 139, 250, 0.12)',
+                borderRadius: '10px',
+                color: '#94a3b8',
+                padding: '7px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -439,18 +523,20 @@ export default function Chat({
                 transition: 'all 0.15s ease'
               }}
               title={sidebarOpen ? "Collapse sidebar" : "Open sidebar"}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(167, 139, 250, 0.12)'; e.currentTarget.style.color = '#818cf8'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.6)'; e.currentTarget.style.color = '#94a3b8'; }}
             >
               {sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeft size={16} />}
             </button>
 
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+              <span style={{ fontSize: '0.92rem', fontWeight: '700', color: '#1e293b', letterSpacing: '-0.01em' }}>
                 {sessionsList.find(s => s.session_id === activeSessionId)?.heading || 
                  sessionsList.find(s => s.session_id === activeSessionId)?.title || 
-                 (messages.length > 0 ? "Active Conversation" : "Safe Neural Chat")}
+                 (messages.length > 0 ? "Active Conversation" : "New Safe Chat")}
               </span>
-              <span className="mono-telemetry" style={{ fontSize: '0.62rem', color: 'var(--accent-blue-core)' }}>
-                CONFIDENTIAL NEURAL COMPANION // END-TO-END SECURE
+              <span style={{ fontSize: '0.65rem', color: '#94a3b8', letterSpacing: '0.04em', textTransform: 'uppercase', fontWeight: '500' }}>
+                Confidential Neural Companion // End-to-End Secure
               </span>
             </div>
           </div>
@@ -463,22 +549,22 @@ export default function Chat({
                 alignItems: 'center',
                 gap: '6px',
                 padding: '5px 10px',
-                background: 'rgba(255, 30, 86, 0.08)',
-                border: '1px solid rgba(255, 30, 86, 0.22)',
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
                 borderRadius: 'var(--radius-pill)',
-                color: 'var(--accent-rose)',
+                color: '#ef4444',
                 fontSize: '0.75rem',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease'
               }}
               title="Delete current conversation"
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 30, 86, 0.18)';
-                e.currentTarget.style.borderColor = 'var(--accent-crimson)';
+                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                e.currentTarget.style.borderColor = '#ef4444';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 30, 86, 0.08)';
-                e.currentTarget.style.borderColor = 'rgba(255, 30, 86, 0.22)';
+                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
               }}
             >
               <Trash2 size={12} />
@@ -487,10 +573,17 @@ export default function Chat({
           )}
         </header>
 
-        {/* Chat Messages Scrolling Window */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        {/* ── CHAT VIEWPORT ── */}
+        <div className="chat-viewport" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0, background: 'linear-gradient(175deg, #FAF8FF 0%, #F8F5FF 30%, #F5F0FA 55%, #FDF2F8 80%, #FAF8FF 100%)' }}>
           
-          <div style={{ width: '100%', maxWidth: '768px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* ── YUSA TOP SECTION ── */}
+          <YusaCompanion mood={currentMood} />
+
+          {/* Chat Messages — this scrolls independently */}
+          <div className="messages-scroll" style={{ flex: 1, overflowY: 'auto', padding: '10px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+
+          
+          <div style={{ width: '100%', maxWidth: '680px', display: 'flex', flexDirection: 'column', gap: '15px', position: 'relative', zIndex: 2 }}>
             
             {/* Empty State / Surreal Hero */}
             {messages.length === 0 ? (
@@ -501,56 +594,21 @@ export default function Chat({
                   alignItems: 'center',
                   justifyContent: 'center',
                   textAlign: 'center',
-                  paddingTop: '40px',
-                  gap: '20px'
+                  paddingTop: '5px',
+                  paddingBottom: '10px',
+                  gap: '12px'
                 }} 
-                className="animate-slideup"
+                className="animate-slideup empty-chat-content"
               >
-                <BrainLogo size={68} animated={true} />
-
                 <div>
-                  <div className="mono-telemetry" style={{ marginBottom: '6px' }}>
-                    YUVAA SAARTHI // NEURAL COMPANION
-                  </div>
-                  <h1 style={{ fontSize: '1.85rem', fontWeight: '800', letterSpacing: '-0.02em', margin: 0 }} className="off-register-text">
+                  <h1 style={{ fontSize: '1.5rem', fontWeight: '800', letterSpacing: '-0.02em', margin: 0, color: '#1e293b', fontFamily: "'Outfit', sans-serif" }}>
                     How can I support you today?
                   </h1>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', maxWidth: '520px', margin: '10px auto 0', lineHeight: '1.5' }}>
+                  <p style={{ color: '#64748b', fontSize: '0.9rem', maxWidth: '560px', margin: '10px auto 0', lineHeight: '1.6' }}>
                     Main aapka confidential companion hoon. English ya Hinglish me apni feelings, exam stress, ya overthinking bina kisi jhijhak share karein.
                   </p>
                 </div>
 
-                {/* 4 Prompt Pills (Cold Snap high-contrast cards) */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                  gap: '12px',
-                  width: '100%',
-                  marginTop: '12px'
-                }}>
-                  {SUGGESTED_PROMPTS.map((prompt, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleSendMessage(prompt.text)}
-                      className="glass-panel"
-                      style={{
-                        padding: '16px',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px',
-                        background: 'rgba(18, 7, 12, 0.65)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '0.9rem' }}>{prompt.label}</span>
-                        <span className="mono-telemetry" style={{ fontSize: '0.62rem', opacity: 0.7 }}>{prompt.tag}</span>
-                      </div>
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: '1.4' }}>{prompt.text}</span>
-                    </button>
-                  ))}
-                </div>
 
               </div>
             ) : (
@@ -562,27 +620,27 @@ export default function Chat({
                     key={index} 
                     style={{ 
                       display: 'flex', 
-                      gap: '14px', 
+                      gap: '12px', 
                       alignItems: 'flex-start',
                       justifyContent: isUser ? 'flex-end' : 'flex-start'
                     }}
                     className="animate-slideup"
                   >
                     {!isUser && (
-                      <BrainLogo size={32} animated={false} />
+                      <BrainLogo size={30} animated={false} />
                     )}
 
                     <div style={{
-                      maxWidth: '82%',
-                      padding: isUser ? '12px 18px' : '12px 16px',
-                      borderRadius: isUser ? '18px 18px 4px 18px' : '4px 18px 18px 18px',
-                      background: isUser ? 'linear-gradient(135deg, rgba(255, 30, 86, 0.18), rgba(244, 114, 182, 0.14))' : 'rgba(255, 255, 255, 0.03)',
-                      border: isUser ? '1px solid var(--border-glow)' : '1px solid var(--border-subtle)',
-                      color: isUser ? 'var(--text-primary)' : 'var(--text-secondary)',
-                      fontSize: '0.94rem',
-                      lineHeight: '1.6',
+                      maxWidth: '78%',
+                      padding: '14px 20px',
+                      borderRadius: isUser ? '20px 20px 6px 20px' : '6px 20px 20px 20px',
+                      background: isUser ? '#EAD8FF' : 'rgba(255, 255, 255, 0.85)',
+                      border: 'none',
+                      color: isUser ? '#1e293b' : '#374151',
+                      fontSize: '0.92rem',
+                      lineHeight: '1.7',
                       whiteSpace: 'pre-wrap',
-                      boxShadow: isUser ? '2px 2px 0 rgba(255, 30, 86, 0.2)' : 'none'
+                      boxShadow: isUser ? '0 3px 12px rgba(168, 85, 247, 0.15)' : '0 3px 14px rgba(168, 85, 247, 0.05)'
                     }}>
                       {msg.content}
                     </div>
@@ -593,41 +651,41 @@ export default function Chat({
 
             {/* Thinking / Loader Indicator */}
             {isLoading && (
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '4px 0' }}>
                 <BrainLogo size={28} animated={true} />
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-pink)', fontSize: '0.84rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#a78bfa', fontSize: '0.84rem' }}>
                   <Loader2 size={14} className="animate-spin" />
-                  <span className="mono-telemetry" style={{ fontSize: '0.74rem' }}>PROCESSING NEURAL CONTEXT...</span>
+                  <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: '500' }}>Thinking...</span>
                 </div>
               </div>
             )}
 
-            {/* Crisis Alert Card (When High Risk / Rule 3.4a triggered) */}
+            {/* Crisis Alert Card */}
             {activeHelplines.length > 0 && (
               <div 
                 style={{
-                  background: 'rgba(255, 30, 86, 0.08)',
-                  border: '1px solid var(--accent-crimson)',
-                  borderRadius: '16px',
-                  padding: '20px',
-                  marginTop: '12px',
+                  background: '#fef2f2',
+                  border: '1px solid #fca5a5',
+                  borderRadius: '18px',
+                  padding: '22px',
+                  marginTop: '8px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '14px',
-                  boxShadow: '0 8px 30px rgba(255, 30, 86, 0.2)'
+                  boxShadow: '0 4px 20px rgba(239, 68, 68, 0.08)'
                 }} 
                 className="animate-slideup"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--accent-crimson)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#dc2626' }}>
                   <ShieldAlert size={22} />
-                  <span style={{ fontWeight: '800', fontSize: '1rem' }} className="off-register-text">
+                  <span style={{ fontWeight: '700', fontSize: '0.95rem' }}>
                     {activeSafeguard === 'abuse_bypass' 
                       ? 'Confidential Helpline Support Surfaced (Rule §3.4a Active)' 
                       : 'Immediate 24/7 Crisis Support Lines'}
                   </span>
                 </div>
 
-                <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.5', margin: 0 }}>
+                <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: '1.6', margin: 0 }}>
                   {activeSafeguard === 'abuse_bypass' 
                     ? 'Your physical safety comes first. Personal emergency contacts have been BYPASSED completely. You can speak confidentially with dedicated youth support officers right now:' 
                     : 'You do not have to carry this alone. Free, confidential professional counselors are available 24/7:'}
@@ -643,31 +701,32 @@ export default function Chat({
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '14px 18px',
-                        background: 'rgba(7, 2, 4, 0.7)',
-                        border: '1px solid var(--border-glow)',
-                        borderRadius: '12px',
-                        color: 'var(--text-primary)',
+                        background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                        border: 'none',
+                        borderRadius: '14px',
+                        color: '#ffffff',
                         textDecoration: 'none',
-                        transition: 'all 0.2s ease'
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 4px 14px rgba(168, 85, 247, 0.2)'
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(255, 30, 86, 0.15)';
-                        e.currentTarget.style.borderColor = 'var(--accent-pink)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(168, 85, 247, 0.3)';
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(7, 2, 4, 0.7)';
-                        e.currentTarget.style.borderColor = 'var(--border-glow)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 14px rgba(168, 85, 247, 0.2)';
                       }}
                     >
                       <div>
-                        <div style={{ fontWeight: '800', fontSize: '0.94rem', color: 'var(--accent-rose)' }}>
+                        <div style={{ fontWeight: '700', fontSize: '0.92rem', color: '#ffffff' }}>
                           {helpline.name}
                         </div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                        <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.75)', marginTop: '3px' }}>
                           {helpline.desc}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-crimson)', fontWeight: '700', fontSize: '0.9rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ffffff', fontWeight: '700', fontSize: '0.88rem' }}>
                         <PhoneCall size={16} />
                         <span>{helpline.number}</span>
                       </div>
@@ -681,30 +740,39 @@ export default function Chat({
             <div ref={messagesEndRef} />
           </div>
 
+          </div>
+
+
+
         </div>
 
-        {/* Bottom Floating Input Bar (Hyperlane style) */}
+        {/* Bottom Input Bar — stays anchored */}
         <div style={{
-          padding: '14px 20px 20px',
+          padding: '10px 24px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          background: 'linear-gradient(to top, var(--bg-primary) 85%, transparent)'
+          background: 'rgba(255, 255, 255, 0.45)',
+          backdropFilter: 'blur(12px)',
+          borderTop: '1px solid rgba(167, 139, 250, 0.06)',
+          flexShrink: 0,
         }}>
           
           <div style={{
             width: '100%',
-            maxWidth: '768px',
+            maxWidth: '680px',
             position: 'relative',
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border-medium)',
-            borderRadius: 'var(--radius-pill)',
-            boxShadow: '0 4px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(244, 114, 182, 0.08)',
+            background: 'rgba(255, 255, 255, 0.85)',
+            border: '1.5px solid rgba(167, 139, 250, 0.18)',
+            borderRadius: '26px',
+            boxShadow: '0 4px 20px rgba(124, 58, 237, 0.06)',
             display: 'flex',
             alignItems: 'center',
-            padding: '6px 8px 6px 20px',
-            transition: 'border-color 0.2s ease'
-          }}>
+            padding: '6px 8px 6px 22px',
+            transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
+          }}
+          onFocus={() => {}}
+          >
             <input
               ref={inputRef}
               type="text"
@@ -718,9 +786,9 @@ export default function Chat({
                 background: 'transparent',
                 border: 'none',
                 outline: 'none',
-                color: 'var(--text-primary)',
-                fontSize: '0.95rem',
-                padding: '8px 0',
+                color: '#1e293b',
+                fontSize: '0.92rem',
+                padding: '10px 0',
                 fontFamily: 'inherit'
               }}
             />
@@ -728,33 +796,31 @@ export default function Chat({
             <button
               onClick={() => handleSendMessage()}
               disabled={!inputText.trim() || isLoading}
+              aria-label="Send message"
               style={{
-                width: '38px',
-                height: '38px',
+                width: '42px',
+                height: '42px',
                 borderRadius: '50%',
                 border: 'none',
-                background: inputText.trim() && !isLoading ? 'linear-gradient(135deg, var(--accent-crimson), var(--accent-cherry))' : 'rgba(255, 255, 255, 0.05)',
-                color: inputText.trim() && !isLoading ? '#ffffff' : 'var(--text-muted)',
+                background: inputText.trim() && !isLoading ? 'linear-gradient(135deg, #a855f7, #ec4899)' : '#f1f5f9',
+                color: inputText.trim() && !isLoading ? '#ffffff' : '#cbd5e1',
                 cursor: inputText.trim() && !isLoading ? 'pointer' : 'default',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
-                boxShadow: inputText.trim() && !isLoading ? '0 0 12px rgba(255, 30, 86, 0.4)' : 'none',
-                transition: 'all 0.15s ease'
+                boxShadow: inputText.trim() && !isLoading ? '0 4px 14px rgba(192, 132, 252, 0.35)' : 'none',
+                transition: 'all 0.2s ease'
               }}
             >
               <Send size={16} />
             </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-            <span>YUVAA Saarthi is a youth well-being companion. In acute danger, call <strong>14416</strong> or <strong>1098</strong>.</span>
-          </div>
-
         </div>
 
       </section>
+
 
     </div>
   );
