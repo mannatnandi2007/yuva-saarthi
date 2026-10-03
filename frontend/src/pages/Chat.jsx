@@ -576,13 +576,13 @@ export default function Chat({
         {/* ── CHAT VIEWPORT WITH DYNAMIC ENVIRONMENT (Task 2) ── */}
         <div 
           className={`chat-viewport dynamic-env env-${currentMood ? currentMood.toLowerCase() : 'normal'}`} 
-          style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}
+          style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0, position: 'relative' }}
         >
           {/* ── YUSA TOP SECTION WITH EMOTION ANIMATIONS ── */}
           <YusaCompanion mood={currentMood} />
 
           {/* Chat Messages — this scrolls independently */}
-          <div className="messages-scroll" style={{ flex: 1, overflowY: 'auto', padding: '10px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div className="messages-scroll" style={{ flex: 1, overflowY: 'auto', padding: '240px 24px 20px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
 
           
           <div style={{ width: '100%', maxWidth: '680px', display: 'flex', flexDirection: 'column', gap: '15px', position: 'relative', zIndex: 2 }}>

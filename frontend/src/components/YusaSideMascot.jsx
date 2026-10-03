@@ -16,8 +16,8 @@ export default function YusaSideMascot({ size = 180, stageMode = 'side' }) {
   const chitterMessages = [
     "Hey there! I'm Yusa! 👋",
     "So excited to meet you! ✨",
-    "Your safe space to vent and breathe 💜",
-    "Your safe space to talk, breathe, and unwind 💜",
+    "Your safe space to vent and breathe 💗",
+    "Your safe space to talk, breathe, and unwind 💗",
     "Hop in! Let's talk about whatever's on your mind 🌸",
     "No judgment here, ever. Just pure support 🫂"
   ];
@@ -62,10 +62,10 @@ export default function YusaSideMascot({ size = 180, stageMode = 'side' }) {
           border: '2px solid #ec4899',
           borderRadius: '18px 18px 18px 4px',
           padding: isCenter ? '12px 22px' : '10px 16px',
-          boxShadow: '0 8px 24px rgba(168, 85, 247, 0.12)',
+          boxShadow: '0 8px 24px rgba(236, 72, 153, 0.12)',
           fontSize: isCenter ? '1rem' : '0.88rem',
           fontWeight: '700',
-          color: '#2e1065',
+          color: '#1a1a2e',
           fontFamily: 'var(--font-body)',
           maxWidth: isCenter ? '320px' : '240px',
           textAlign: 'center',
@@ -111,7 +111,7 @@ export default function YusaSideMascot({ size = 180, stageMode = 'side' }) {
       </div>
 
       {/* Interactive Helper Label */}
-      <span style={{ fontSize: '0.72rem', color: '#a855f7', fontWeight: '600', letterSpacing: '0.04em' }}>
+      <span style={{ fontSize: '0.72rem', color: '#ec4899', fontWeight: '600', letterSpacing: '0.04em' }}>
         ✨ Click Yusa to say hi!
       </span>
     </div>
