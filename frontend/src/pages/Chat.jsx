@@ -51,9 +51,25 @@ export default function Chat({
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  
+
   // Active crisis state if triggered
   const [activeHelplines, setActiveHelplines] = useState([]);
   const [activeSafeguard, setActiveSafeguard] = useState(null);
+    /* ===========================
+      PHASE 6 STATES
+  =========================== */
+
+  const [conversationSummary, setConversationSummary] = useState("");
+  const [followUpQuestion, setFollowUpQuestion] = useState("");
+  const [emotionHistory, setEmotionHistory] = useState([]);
+  const [conversationInsights, setConversationInsights] = useState({
+    totalMessages: 0,
+    dominantMood: "NORMAL",
+    supportLevel: "Low"
+  });
+
+  const [typingStage, setTypingStage] = useState("");
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -128,6 +144,95 @@ export default function Chat({
   };
   
   const currentMood = detectMood(messages);
+
+    /* ===========================
+      PHASE 6 HELPERS
+  =========================== */
+
+  useEffect(() => {
+    if (messages.length === 0) return;
+
+    const mood = detectMood(messages);
+
+    setEmotionHistory(prev => [
+      ...prev,
+      {
+        mood,
+        time: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit"
+        })
+      }
+    ]);
+
+    setConversationInsights({
+      totalMessages: messages.length,
+      dominantMood: mood,
+      supportLevel:
+        mood === "VERY_SCARED"
+          ? "Critical"
+          : mood === "SAD" ||
+            mood === "ANXIOUS" ||
+            mood === "SCARED"
+          ? "High"
+          : mood === "CONFUSED" ||
+            mood === "TIRED"
+          ? "Medium"
+          : "Low"
+    });
+
+  }, [messages]);
+
+
+
+  const updateConversationSummary = (allMessages) => {
+    const userMessages = allMessages
+      .filter(m => m.sender === "user")
+      .map(m => m.content);
+
+    if (userMessages.length === 0) return;
+
+    const recent = userMessages.slice(-5).join(" ");
+
+    setConversationSummary(recent.substring(0, 220));
+  };
+
+
+
+  const generateFollowUpQuestion = (mood) => {
+    switch (mood) {
+
+      case "SAD":
+        return "Would you like to tell me what happened today?";
+
+      case "ANXIOUS":
+        return "What is worrying you the most right now?";
+
+      case "ANGRY":
+        return "Can you share what made you feel this way?";
+
+      case "LONELY":
+        return "Is there someone you wish you could talk to?";
+
+      case "VERY_SCARED":
+        return "Are you safe right now? I'm here with you.";
+
+      case "CONFUSED":
+        return "Which part feels the most overwhelming?";
+
+      case "TIRED":
+        return "Have you had a chance to rest today?";
+
+      case "HAPPY":
+        return "That's wonderful! What made today better?";
+
+      case "OVERJOYED":
+        return "I'd love to hear more about this happy moment.";
+
+      default:
+        return "Would you like to tell me a little more?";
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -211,6 +316,19 @@ export default function Chat({
       setSessionsList(prev => prev.filter(s => s.session_id !== sessionId));
       if (activeSessionId === sessionId) {
         const remaining = sessionsList.filter(s => s.session_id !== sessionId);
+        setSessionsList(prev => {
+          const updated = prev.filter(s => s.session_id !== sessionId);
+
+          if (activeSessionId === sessionId) {
+            if (updated.length > 0) {
+              loadSession(updated[0].session_id);
+            } else {
+              createNewChat();
+            }
+          }
+
+          return updated;
+        });
         if (remaining.length > 0) {
           loadSession(remaining[0].session_id);
         } else {
@@ -232,6 +350,9 @@ export default function Chat({
       createNewChat();
     }
   };
+  
+
+ 
 
   const loadSession = async (sessionId) => {
     if (sessionId === activeSessionId) return;
@@ -263,17 +384,35 @@ export default function Chat({
     setMessages(prev => [...prev, userMessage]);
     if (!textOverride) setInputText('');
     setIsLoading(true);
+    setTypingStage("Understanding your message...");
 
     try {
       const headers = getAuthHeaders();
+      setTypingStage("Thinking carefully...");
       const response = await axios.post(`${API_BASE_URL}/chat`, {
         session_id: activeSessionId || 'default-session',
         message: textToSend.trim()
       }, { headers, timeout: 45000 });
 
       const data = response.data;
-      const assistantMessage = { sender: 'assistant', content: data.reply };
-      setMessages(prev => [...prev, assistantMessage]);
+      const assistantMessage = {
+        sender: "assistant",
+        content: data.reply
+      };
+
+      const updatedMessages = [
+        ...messages,
+        userMessage,
+        assistantMessage
+      ];
+
+      setMessages(updatedMessages);
+
+      const mood = detectMood(updatedMessages);
+
+      setFollowUpQuestion(generateFollowUpQuestion(mood));
+
+      updateConversationSummary(updatedMessages);
 
       if (data.heading) {
         setSessionsList(prev => prev.map(s => 
@@ -304,12 +443,21 @@ export default function Chat({
 
     } catch (error) {
       console.error("Chat error:", error);
-      const errDetail = error.response?.data?.detail || "Could not connect to the YUVAA Saarthi server. Please make sure the backend is running.";
-      setMessages(prev => [...prev, { 
-        sender: 'assistant', 
-        content: errDetail 
-      }]);
+
+      const errDetail =
+        error.response?.data?.detail ||
+        "Could not connect to the YUVAA Saarthi server. Please make sure the backend is running.";
+
+      setMessages(prev => [
+        ...prev,
+        {
+          sender: "assistant",
+          content: errDetail
+        }
+      ]);
+
     } finally {
+      setTypingStage("");      // ← ADD THIS LINE
       setIsLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
     }
@@ -589,30 +737,100 @@ export default function Chat({
             
             {/* Empty State / Surreal Hero */}
             {messages.length === 0 ? (
-              <div 
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  textAlign: 'center',
-                  paddingTop: '5px',
-                  paddingBottom: '10px',
-                  gap: '12px'
-                }} 
-                className="animate-slideup empty-chat-content"
-              >
-                <div>
-                  <h1 style={{ fontSize: '1.5rem', fontWeight: '800', letterSpacing: '-0.02em', margin: 0, color: '#1e293b', fontFamily: "'Outfit', sans-serif" }}>
+              <>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    textAlign: "center",
+                    paddingTop: "5px",
+                    paddingBottom: "18px"
+                  }}
+                  className="animate-slideup empty-chat-content"
+                >
+                  <h1
+                    style={{
+                      fontSize: "1.6rem",
+                      fontWeight: 800,
+                      color: "#1e293b",
+                      marginBottom: "12px"
+                    }}
+                  >
                     How can I support you today?
                   </h1>
-                  <p style={{ color: '#64748b', fontSize: '0.9rem', maxWidth: '560px', margin: '10px auto 0', lineHeight: '1.6' }}>
-                    Main aapka confidential companion hoon. English ya Hinglish me apni feelings, exam stress, ya overthinking bina kisi jhijhak share karein.
+
+                  <p
+                    style={{
+                      color: "#64748b",
+                      maxWidth: 560,
+                      lineHeight: 1.7
+                    }}
+                  >
+                    Main aapka confidential companion hoon.
+                    English ya Hinglish me apni feelings,
+                    exam stress, anxiety ya overthinking
+                    bina kisi jhijhak share karein.
                   </p>
                 </div>
 
+                {/* Suggested Prompts */}
 
-              </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(2,1fr)",
+                    gap: "14px",
+                    marginTop: "24px"
+                  }}
+                >
+                  {SUGGESTED_PROMPTS.map((prompt) => (
+                    <button
+                      key={prompt.label}
+                      onClick={() => handleSendMessage(prompt.text)}
+                      style={{
+                        padding: "18px",
+                        borderRadius: "18px",
+                        border: "1px solid rgba(219,39,119,.18)",
+                        background: "rgba(255,255,255,.82)",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        transition: ".2s"
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = "translateY(-2px)";
+                        e.currentTarget.style.boxShadow =
+                          "0 10px 30px rgba(219,39,119,.12)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = "";
+                        e.currentTarget.style.boxShadow = "";
+                      }}
+                    >
+                      <div
+                        style={{
+                          color: "#db2777",
+                          fontWeight: 700,
+                          marginBottom: "6px"
+                        }}
+                      >
+                        {prompt.label}
+                      </div>
+
+                      <div
+                        style={{
+                          color: "#64748b",
+                          fontSize: ".86rem",
+                          lineHeight: 1.5
+                        }}
+                      >
+                        {prompt.text}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
+
             ) : (
               /* Message Stream */
               messages.map((msg, index) => {
@@ -632,19 +850,51 @@ export default function Chat({
                       <BrainLogo size={30} animated={false} />
                     )}
 
-                    <div style={{
-                      maxWidth: '78%',
-                      padding: '14px 20px',
-                      borderRadius: isUser ? '20px 20px 6px 20px' : '6px 20px 20px 20px',
-                      background: isUser ? '#EAD8FF' : 'rgba(255, 255, 255, 0.85)',
-                      border: 'none',
-                      color: isUser ? '#1e293b' : '#374151',
-                      fontSize: '0.92rem',
-                      lineHeight: '1.7',
-                      whiteSpace: 'pre-wrap',
-                      boxShadow: isUser ? '0 3px 12px rgba(168, 85, 247, 0.15)' : '0 3px 14px rgba(168, 85, 247, 0.05)'
-                    }}>
+                    <div
+                      style={{
+                        maxWidth: "78%",
+                        padding: "14px 20px",
+                        borderRadius: isUser
+                          ? "20px 20px 6px 20px"
+                          : "6px 20px 20px 20px",
+                        background: isUser
+                          ? "#EAD8FF"
+                          : "rgba(255,255,255,0.90)",
+                        color: "#374151",
+                        position: "relative",
+                        whiteSpace: "pre-wrap",
+                        lineHeight: "1.7",
+                        fontSize: "0.92rem",
+                        boxShadow: isUser
+                          ? "0 3px 12px rgba(168,85,247,.15)"
+                          : "0 3px 14px rgba(168,85,247,.05)"
+                      }}
+                    >
+
+                      {/* Assistant Copy Button */}
+
+                      {!isUser && (
+                        <button
+                          onClick={() => navigator.clipboard.writeText(msg.content)}
+                          style={{
+                            position: "absolute",
+                            top: 8,
+                            right: 8,
+                            border: "none",
+                            background: "transparent",
+                            cursor: "pointer",
+                            fontSize: "11px",
+                            color: "#a855f7"
+                          }}
+                        >
+                          Copy
+                        </button>
+                      )}
+
+                      {/* Message */}
+
                       {msg.content}
+
                     </div>
                   </div>
                 );
@@ -657,7 +907,15 @@ export default function Chat({
                 <BrainLogo size={28} animated={true} />
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#a78bfa', fontSize: '0.84rem' }}>
                   <Loader2 size={14} className="animate-spin" />
-                  <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: '500' }}>Thinking...</span>
+                  <span
+                    style={{
+                      fontSize: "0.78rem",
+                      color: "#94a3b8",
+                      fontWeight: "500"
+                    }}
+                  >
+                    {typingStage || "Thinking..."}
+                  </span>
                 </div>
               </div>
             )}
@@ -738,7 +996,121 @@ export default function Chat({
 
               </div>
             )}
+            {followUpQuestion && (
+              <div
+                style={{
+                  marginTop: "20px",
+                  padding: "16px",
+                  borderRadius: "16px",
+                  background: "#fff7fb",
+                  border: "1px solid #f9a8d4",
+                  color: "#be185d",
+                  fontSize: "0.9rem",
+                  lineHeight: 1.6
+                }}
+              >
+                <strong>💬 Follow-up Question</strong>
 
+                <div style={{ marginTop: "8px" }}>
+                  {followUpQuestion}
+                </div>
+              </div>
+            )}
+            {conversationSummary && (
+              <div
+                style={{
+                  marginTop: "15px",
+                  padding: "16px",
+                  borderRadius: "16px",
+                  background: "#f8fafc",
+                  border: "1px solid #cbd5e1",
+                  color: "#334155",
+                  fontSize: "0.88rem",
+                  lineHeight: 1.6
+                }}
+              >
+                <strong>📝 Conversation Summary</strong>
+
+                <div style={{ marginTop: "8px" }}>
+                  {conversationSummary}
+                </div>
+              </div>
+            )}  
+            {messages.length > 0 && (
+              <div
+                style={{
+                  marginTop: "15px",
+                  padding: "16px",
+                  borderRadius: "16px",
+                  background: "#fdf4ff",
+                  border: "1px solid #e9d5ff",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: "12px",
+                  textAlign: "center"
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "#64748b"
+                    }}
+                  >
+                    Messages
+                  </div>
+
+                  <div
+                    style={{
+                      fontWeight: "700",
+                      fontSize: "1.2rem"
+                    }}
+                  >
+                    {conversationInsights.totalMessages}
+                  </div>
+                </div>
+
+                <div>
+                  <div
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "#64748b"
+                    }}
+                  >
+                    Mood
+                  </div>
+
+                  <div
+                    style={{
+                      fontWeight: "700",
+                      color: "#db2777"
+                    }}
+                  >
+                    {conversationInsights.dominantMood}
+                  </div>
+                </div>
+
+                <div>
+                  <div
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "#64748b"
+                    }}
+                  >
+                    Support
+                  </div>
+
+                  <div
+                    style={{
+                      fontWeight: "700",
+                      color: "#7c3aed"
+                    }}
+                  >
+                    {conversationInsights.supportLevel}
+                  </div>
+                </div>
+              </div>
+            )}         
             <div ref={messagesEndRef} />
           </div>
 
@@ -759,6 +1131,7 @@ export default function Chat({
           borderTop: '1px solid rgba(167, 139, 250, 0.06)',
           flexShrink: 0,
         }}>
+
           
           <div style={{
             width: '100%',
