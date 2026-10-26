@@ -1,4 +1,4 @@
-# YUVAA Saarthi — Users Router
+# Yuva Saarthi — Users Router
 # Reference: PRD §3.1 (User profile) & Execution Plan Phase 2
 #
 # Endpoints:

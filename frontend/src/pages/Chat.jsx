@@ -1,4 +1,4 @@
-// YUVAA Saarthi — Surreal Companion Interface
+// Yuva Saarthi — Surreal Companion Interface
 // Hallmark: Cold Snap × Hyperlane × Off-Register (Red & Pink Theme)
 // Featuring Synaptic Brain Avatars, Chromatic Shadows, & Crisis Escalation Card
 
@@ -446,7 +446,7 @@ export default function Chat({
 
       const errDetail =
         error.response?.data?.detail ||
-        "Could not connect to the YUVAA Saarthi server. Please make sure the backend is running.";
+        "Could not connect to the Yuva Saarthi server. Please make sure the backend is running.";
 
       setMessages(prev => [
         ...prev,
@@ -1151,7 +1151,7 @@ export default function Chat({
             <input
               ref={inputRef}
               type="text"
-              placeholder="Message YUVAA Saarthi... (English ya Hinglish me baat karein)"
+              placeholder="Message Yuva Saarthi... (English ya Hinglish me baat karein)"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={handleKeyDown}

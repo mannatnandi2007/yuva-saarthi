@@ -1,4 +1,4 @@
-# YUVAA Saarthi — Chat Orchestration Service
+# Yuva Saarthi — Chat Orchestration Service
 # Reference: PRD §3.2, §3.3, §3.4, §3.4a & Execution Plan Phase 2
 #
 # BUG-001 FIX: High-severity non-abuse messages now trigger Bland AI escalation.

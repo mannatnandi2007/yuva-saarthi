@@ -1,4 +1,4 @@
-# YUVAA Saarthi - Folder-Based RAG Document Ingestion & MiniLM Retriever
+# Yuva Saarthi - Folder-Based RAG Document Ingestion & MiniLM Retriever
 #
 # Pipeline:
 # PDF / TXT / MD / DOCX
@@ -364,6 +364,8 @@ def _get_minilm_model():
     _MODEL_TRIED = True
 
     try:
+        import warnings
+        warnings.filterwarnings("ignore", message=".*unauthenticated requests to the HF Hub.*")
         from sentence_transformers import SentenceTransformer
 
         logger.info(

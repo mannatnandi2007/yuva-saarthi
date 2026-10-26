@@ -1,4 +1,4 @@
-# YUVAA Saarthi FastAPI Main Application
+# Yuva Saarthi FastAPI Main Application
 # Reference: PRD §4 (Tech Stack FastAPI) & Execution Plan Day 1
 
 from fastapi import FastAPI
@@ -7,7 +7,7 @@ from app.routers import auth, chat, risk, escalation, rag, users, demo, health
 from app.config import settings
 
 app = FastAPI(
-    title="YUVAA Saarthi Backend API",
+    title="Yuva Saarthi Backend API",
     description="Youth well-being companion with safety-routing, crisis escalation, and Hinglish language support.",
     version="1.1.0"
 )
@@ -28,14 +28,17 @@ app.include_router(risk.router)
 app.include_router(escalation.router)
 app.include_router(rag.router)
 app.include_router(users.router)
-app.include_router(demo.router)  # Phase 5: Demo script integration
 app.include_router(health.router)  # Phase 6: LLM provider health
+
+# Phase 1: demo routes gated behind ENABLE_DEMO_ROUTES (default False)
+if settings.enable_demo_routes:
+    app.include_router(demo.router)
 
 @app.get("/")
 async def read_root():
     return {
         "status": "healthy",
-        "app": "YUVAA Saarthi Backend API",
+        "app": "Yuva Saarthi Backend API",
         "docs_url": "/docs"
     }
 

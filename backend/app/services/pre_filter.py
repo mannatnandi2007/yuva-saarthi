@@ -1,11 +1,10 @@
-# YUVAA Saarthi Keyword Pre-Filter Module
+# Yuva Saarthi Keyword Pre-Filter Module
 # Reference: PRD §3.6 (Hinglish/Hindi-in-Roman-script pre-filter) & Execution Plan Day 3
 
 import re
 from typing import List, Tuple
 
-# Side-by-side key term lists targeting self-harm, domestic abuse, and extreme distress.
-# Covered by Yashika's NLP keyword-layer tasks (Execution Plan Day 3).
+# Maintained under Aklesh's NLP keyword-layer tasks (reassigned from Yashika).
 
 ENGLISH_TERMS: List[str] = [
     # Self-Harm & Suicide

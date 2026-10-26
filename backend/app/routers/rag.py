@@ -1,4 +1,4 @@
-# YUVAA Saarthi RAG Router
+# Yuva Saarthi RAG Router
 # Reference: PRD §4 (Tech Stack pgvector) & §6 (RAG ingestion + retrieval)
 #
 # BUG-002 FIX: /ingest now actually writes to the rag_documents table in Supabase.

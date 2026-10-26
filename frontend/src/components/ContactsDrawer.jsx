@@ -79,7 +79,7 @@ export default function ContactsDrawer({ isOpen, onClose, contacts = [] }) {
 
         {/* Priority Order Info */}
         <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', lineHeight: '1.5', marginTop: 0, marginBottom: '20px' }}>
-          In the event of an acute self-harm crisis, YUVAA Saarthi dispatches sequential emergency voice alerts to these contacts in exact numerical order.
+          In the event of an acute self-harm crisis, Yuva Saarthi dispatches sequential emergency voice alerts to these contacts in exact numerical order.
         </p>
 
         {/* Contacts List */}

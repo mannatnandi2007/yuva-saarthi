@@ -1,4 +1,4 @@
-# YUVAA Saarthi — Demo Script Integration Router
+# Yuva Saarthi — Demo Script Integration Router
 # Phase 5: Demo endpoint for showcasing all system capabilities in one call.
 # Provides a controlled walkthrough of: pre-filter → classifier → RAG → LLM → escalation routing.
 
@@ -58,7 +58,7 @@ class DemoRequest(BaseModel):
 @router.get("/scenarios", status_code=status.HTTP_200_OK)
 async def list_demo_scenarios():
     """
-    List all available demo scenarios for the YUVAA Saarthi system walkthrough.
+    List all available demo scenarios for the Yuva Saarthi system walkthrough.
     """
     return {
         "available_scenarios": [
@@ -77,7 +77,7 @@ async def list_demo_scenarios():
 @router.post("/run", status_code=status.HTTP_200_OK)
 async def run_demo(payload: DemoRequest):
     """
-    Full pipeline demo: runs a message through the complete YUVAA Saarthi system.
+    Full pipeline demo: runs a message through the complete Yuva Saarthi system.
 
     Pipeline stages demonstrated:
       1. Keyword pre-filter (English + Hinglish tripwire)

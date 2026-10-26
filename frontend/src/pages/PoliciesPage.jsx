@@ -33,7 +33,7 @@ export default function PoliciesPage({ onBack, onMarkAsRead }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <BrainLogo size={28} />
             <span style={{ fontFamily: 'var(--font-display)', fontWeight: '700', fontSize: '0.92rem', color: 'var(--text-secondary)' }}>
-              YUVAA Saarthi Charter
+              Yuva Saarthi Charter
             </span>
           </div>
         </div>
@@ -46,7 +46,7 @@ export default function PoliciesPage({ onBack, onMarkAsRead }) {
             Safety Net, Not Surveillance
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.96rem', maxWidth: '540px', margin: '0 auto' }}>
-            How YUVAA Saarthi protects your privacy, handles sensitive disclosures, and keeps you safe.
+            How Yuva Saarthi protects your privacy, handles sensitive disclosures, and keeps you safe.
           </p>
         </header>
 

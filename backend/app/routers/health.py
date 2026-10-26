@@ -1,4 +1,4 @@
-﻿# YUVAA Saarthi — Health Router
+# Yuva Saarthi — Health Router
 # Phase 6: Operational health endpoints for LLM provider monitoring.
 # Reference: PRD §4 (Tech Stack) & Phase 6 task list.
 

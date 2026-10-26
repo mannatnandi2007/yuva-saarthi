@@ -1,8 +1,11 @@
-# YUVAA Saarthi FastAPI Settings Config Module
+# Yuva Saarthi FastAPI Settings Config Module
 # Reference: PRD §4 (Recommended Tech Stack) & Execution Plan
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
+
+import warnings
+warnings.filterwarnings("ignore", message=".*unauthenticated requests to the HF Hub.*")
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -23,12 +26,15 @@ class Settings(BaseSettings):
 
     # JWT Secret for signing custom session tokens (BUG-003 fix)
     # Generate a strong secret: python -c "import secrets; print(secrets.token_hex(32))"
-    jwt_secret: str = "yuvaa-saarthi-default-dev-secret-change-in-production"
+    jwt_secret: str = "yuva-saarthi-default-dev-secret-change-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expire_hours: int = 72
 
     # Dev Bypass
     dev_bypass_auth: bool = False
+
+    # Demo Routes Gating (Phase 1)
+    enable_demo_routes: bool = False
 
     # Settings configurations to read from .env if present
     model_config = SettingsConfigDict(

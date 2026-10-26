@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { ShieldCheck, Info, HeartHandshake, EyeOff, AlertTriangle, ExternalLink, Lock } from 'lucide-react';
 
 /**
- * YUVAA Saarthi Policy Disclosure & Consent Screen
+ * Yuva Saarthi Policy Disclosure & Consent Screen
  * Enforces reading safety policies before confirmation checkboxes unlock.
  * Completely free of PRD rule numbers (§3.4a, §5.2).
  */
@@ -197,7 +197,7 @@ export default function Consent({ userSession, onAccept, onNavigate, hasReadPoli
               style={{ width: '18px', height: '18px', accentColor: 'var(--accent-cyan)', marginTop: '2px', cursor: isUnlocked ? 'pointer' : 'not-allowed' }}
             />
             <span style={{ color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-              I consent to the YUVAA Saarthi safety agreement and agree to prioritize my well-being.
+              I consent to the Yuva Saarthi safety agreement and agree to prioritize my well-being.
             </span>
           </label>
         </div>

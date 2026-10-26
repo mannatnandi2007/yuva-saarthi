@@ -1,4 +1,4 @@
-# YUVAA Saarthi — Backend API Tests
+# Yuva Saarthi — Backend API Tests
 # Reference: Execution Plan Phase 2 (testing requirements)
 #
 # Strategy:
@@ -602,7 +602,7 @@ class TestSwaggerDocs:
         resp = client.get("/openapi.json")
         assert resp.status_code == 200
         schema = resp.json()
-        assert schema["info"]["title"] == "YUVAA Saarthi Backend API"
+        assert schema["info"]["title"] == "Yuva Saarthi Backend API"
 
     def test_swagger_ui_loads(self):
         resp = client.get("/docs")
@@ -796,7 +796,8 @@ class TestBlandAIEscalation:
 # ===========================================================================
 
 class TestPhase4RAG:
-    def test_rag_retrieves_exam_guidelines(self):
+    @patch("app.services.folder_rag_service.search_folder_rag", return_value=[])
+    def test_rag_retrieves_exam_guidelines(self, _mock_rag):
         resp = client.post("/rag/retrieve", json={
             "query_text": "I am feeling so anxious about exams and study pressure",
             "limit": 2
@@ -809,7 +810,8 @@ class TestPhase4RAG:
         assert any("NIMHANS" in s for s in sources)
         assert any("Academic Pressure" in r["title"] for r in results)
 
-    def test_rag_retrieves_grounding_for_panic(self):
+    @patch("app.services.folder_rag_service.search_folder_rag", return_value=[])
+    def test_rag_retrieves_grounding_for_panic(self, _mock_rag):
         resp = client.post("/rag/retrieve", json={
             "query_text": "mujhe bohot panic aur darr lag raha hai can't breathe",
             "limit": 2
@@ -819,7 +821,8 @@ class TestPhase4RAG:
         results = data["results"]
         assert any("5-4-3-2-1" in r["guideline"] or "Physiological Sigh" in r["guideline"] for r in results)
 
-    def test_rag_retrieves_loneliness_guideline(self):
+    @patch("app.services.folder_rag_service.search_folder_rag", return_value=[])
+    def test_rag_retrieves_loneliness_guideline(self, _mock_rag):
         resp = client.post("/rag/retrieve", json={
             "query_text": "I feel completely alone and isolated, koi nahi hai mere sath",
             "limit": 2

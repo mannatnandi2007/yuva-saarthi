@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import Yusa3D from './Yusa3D.jsx';
 
 /**
- * YusaCompanion — YUVAA Saarthi Emotional Companion Mascot
+ * YusaCompanion — Yuva Saarthi Emotional Companion Mascot
  *
  * Yusa is a cushion-style character that visually reflects the detected
  * conversational mood (NORMAL, SAD, ANGRY, HAPPY, OVERJOYED, etc.).

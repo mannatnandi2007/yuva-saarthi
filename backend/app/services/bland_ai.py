@@ -1,4 +1,4 @@
-# YUVAA Saarthi — Bland AI Telephony Integration Service
+# Yuva Saarthi — Bland AI Telephony Integration Service
 # Reference: PRD §3.4 (Emergency Contact Alert System — Sequential Voice Escalation)
 # Owned by Mannat (Phase 3: Bland AI Pathway Setup & Sequential Escalation Loop)
 #
@@ -39,11 +39,11 @@ def build_crisis_call_task(
     guardian_title = designation or relationship or "Guardian"
 
     return (
-        f"You are Yusa, an automated emergency voice responder calling from YUVAA Saarthi, India's youth safety and mental well-being companion. "
+        f"You are Yusa, an automated emergency voice responder calling from Yuva Saarthi, India's youth safety and mental well-being companion. "
         f"You are directly speaking with {contact_name}, who is officially designated as {guardian_title} for {user_label}. "
         f"\nCRITICAL DIRECTIVES:\n"
         f"1. IMMEDIATE INTRODUCTION & REAL-EMERGENCY WARNING: Introduce yourself quickly and clearly state: "
-        f"'Hello {contact_name}. This is Yusa calling from YUVAA Saarthi. Please pay close attention: this is NOT a simulation, test, or mock call. This is an actual, real-time safety alert.'\n"
+        f"'Hello {contact_name}. This is Yusa calling from Yuva Saarthi. Please pay close attention: this is NOT a simulation, test, or mock call. This is an actual, real-time safety alert.'\n"
         f"2. SITUATION BRIEF: Clearly and calmly explain that our verified safety monitoring detected an escalation involving {escalation_reason} during {user_label}'s current session.\n"
         f"3. URGENT CALL TO ACTION: Request that as their designated {guardian_title}, they immediately check in on {user_label} in person or by phone with warmth, patience, and non-judgmental care.\n"
         f"4. HELPLINE SUPPORT: Inform them that certified national 24/7 mental health emergency helplines are active right now: Tele-MANAS at 14416 and KIRAN at 1800-599-0019.\n"
@@ -84,7 +84,7 @@ def trigger_bland_ai_call(
         escalation_reason=escalation_reason
     )
     first_sentence = (
-        f"Hello {contact_name}, this is Yusa from YUVAA Saarthi. Please listen carefully: this is NOT a mock call, but an actual urgent safety alert regarding {user_label}."
+        f"Hello {contact_name}, this is Yusa from Yuva Saarthi. Please listen carefully: this is NOT a mock call, but an actual urgent safety alert regarding {user_label}."
     )
 
     payload = {

@@ -1,4 +1,4 @@
-# YUVAA Saarthi Risk Classifier
+# Yuva Saarthi Risk Classifier
 # Phase 5: False positive threshold tuning applied.
 import os
 import json
@@ -59,7 +59,7 @@ class RiskClassificationSchema(BaseModel):
     )
 
 
-CRISIS_DETECTION_SYSTEM_PROMPT = """You are the clinical safety and risk classification system for YUVAA Saarthi, an Indian youth mental well-being companion.
+CRISIS_DETECTION_SYSTEM_PROMPT = """You are the clinical safety and risk classification system for Yuva Saarthi, an Indian youth mental well-being companion.
 Your job is to deeply understand the user's intent, emotional state, context, and nuance. You understand English, Hindi, and colloquial Hinglish (Hindi in Latin alphabet).
 
 CRITICAL CONTEXTUAL & CULTURAL UNDERSTANDING (Meaning changes person-to-person):
@@ -235,10 +235,8 @@ def _call_llm_classifier(message: str, rolling_summary: Optional[str] = None) ->
         try:
             full_prompt = f"{CRISIS_DETECTION_SYSTEM_PROMPT}\n\n{user_prompt}"
             ACTIVE_MODELS = [
+                "gemini-2.5-flash",
                 "gemini-flash-latest",
-                "gemini-3.8-flash",
-                "gemini-3.1-flash-lite",
-                "gemini-3.1-pro-preview",
             ]
             for model in ACTIVE_MODELS:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={gemini_key}"
@@ -247,7 +245,7 @@ def _call_llm_classifier(message: str, rolling_summary: Optional[str] = None) ->
                     "generationConfig": {"responseMimeType": "application/json", "temperature": 0.1}
                 }
                 try:
-                    resp = httpx.post(url, json=payload, timeout=httpx.Timeout(1.8, connect=1.0))
+                    resp = httpx.post(url, json=payload, timeout=httpx.Timeout(5.0, connect=2.0))
                     if resp.status_code == 200:
                         candidates = resp.json().get("candidates", [])
                         if candidates and "content" in candidates[0]:

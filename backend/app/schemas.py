@@ -1,8 +1,8 @@
-# YUVAA Saarthi — Shared Pydantic Schemas
+# Yuva Saarthi — Shared Pydantic Schemas
 # Reference: PRD §5 (Data Models) & Execution Plan Phase 2
 #
 # All API request payloads and response shapes are defined here so routes stay
-# thin and teammates (Mannat, Yashika, Aakansha) have one authoritative contract
+# thin and teammates (Mannat, Aklesh, Aakansha, Khushal) have one authoritative contract
 # to reference when integrating.
 
 from pydantic import BaseModel, Field, ConfigDict

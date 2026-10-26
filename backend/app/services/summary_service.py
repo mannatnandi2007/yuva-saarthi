@@ -1,4 +1,4 @@
-# YUVAA Saarthi Rolling Summary Generator
+# Yuva Saarthi Rolling Summary Generator
 # Reference: PRD §3.2 (Rolling 150-word Conversation Summary) & Execution Plan Day 5
 # Owned by Mannat (Phase 4: Rolling Summary Generator)
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # Local in-memory store for session summaries when offline/dev-mode
 _IN_MEMORY_SUMMARIES: Dict[str, str] = {}
 
-SUMMARY_SYSTEM_PROMPT = """You are an expert conversational context summarizer for YUVAA Saarthi, a youth mental well-being companion.
+SUMMARY_SYSTEM_PROMPT = """You are an expert conversational context summarizer for Yuva Saarthi, a youth mental well-being companion.
 Your task is to maintain a concise rolling summary (STRICT MAXIMUM 150 WORDS) of the ongoing dialogue.
 
 Guidelines:
@@ -55,10 +55,8 @@ def generate_rolling_summary(
         try:
             import httpx
             ACTIVE_MODELS = [
+                "gemini-2.5-flash",
                 "gemini-flash-latest",
-                "gemini-3.8-flash",
-                "gemini-3.1-flash-lite",
-                "gemini-3.1-pro-preview",
             ]
             for model_name in ACTIVE_MODELS:
                 endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
@@ -72,7 +70,7 @@ def generate_rolling_summary(
                     }
                 }
                 try:
-                    resp = httpx.post(endpoint, json=payload, timeout=httpx.Timeout(1.8, connect=1.0))
+                    resp = httpx.post(endpoint, json=payload, timeout=httpx.Timeout(5.0, connect=2.0))
                     if resp.status_code == 200:
                         data = resp.json()
                         summary = data["candidates"][0]["content"]["parts"][0]["text"].strip()

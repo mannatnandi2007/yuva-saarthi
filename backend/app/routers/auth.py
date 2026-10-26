@@ -1,4 +1,4 @@
-# YUVAA Saarthi Auth Router
+# Yuva Saarthi Auth Router
 # Reference: PRD §3.1 (Auth & Onboarding)
 # BUG-003 FIX: Generate proper HS256-signed JWT tokens instead of plain strings.
 # BUG-008 FIX: Supabase is primary store; in-memory dict is only a dev-session cache.

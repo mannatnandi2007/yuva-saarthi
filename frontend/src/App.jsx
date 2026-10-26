@@ -132,7 +132,7 @@ export default function App() {
         <div 
           onClick={() => setCurrentPage(userSession ? 'chat' : 'landing')}
           style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
-          title="YUVAA Saarthi Home"
+          title="Yuva Saarthi Home"
         >
           <BrainLogo size={34} />
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -144,7 +144,7 @@ export default function App() {
               lineHeight: 1.15,
               color: '#2e1065'
             }}>
-              YUVAA <span style={{ color: '#db2777' }}>Saarthi</span>
+              Yuva <span style={{ color: '#db2777' }}>Saarthi</span>
             </span>
             <span style={{ fontSize: '0.66rem', color: '#9333ea', letterSpacing: '0.04em', fontWeight: '700', textTransform: 'uppercase' }}>
               Youth Well-Being Companion

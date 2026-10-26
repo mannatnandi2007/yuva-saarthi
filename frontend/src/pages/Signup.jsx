@@ -1,4 +1,4 @@
-// YUVAA Saarthi — Modern Aesthetic Onboarding & Login
+// Yuva Saarthi — Modern Aesthetic Onboarding & Login
 // Redesigned with strict 10-digit Indian phone inputs, fixed +91 prefix, and dark glassmorphism
 
 import React, { useState } from 'react';
@@ -223,7 +223,7 @@ export default function Signup({ onComplete, onNavigate, initialMode = 'signup',
           
           <div style={{ maxWidth: '320px' }}>
             <h2 style={{ fontSize: '1.35rem', fontWeight: '800', color: '#2e1065', marginBottom: '8px' }}>
-              {isLoginMode ? "Welcome Back to YUVAA!" : "Say Hi to Yusa ✨"}
+              {isLoginMode ? "Welcome Back to Yuva Saarthi!" : "Say Hi to Yusa ✨"}
             </h2>
             <p style={{ fontSize: '0.9rem', color: '#581c87', lineHeight: '1.55' }}>
               {isLoginMode 

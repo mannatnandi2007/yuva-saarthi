@@ -1,4 +1,4 @@
-# YUVAA Saarthi — Phase 3 & 5 Escalation Loop & Safety Tests (Mannat)
+# Yuva Saarthi — Phase 3 & 5 Escalation Loop & Safety Tests (Mannat)
 # Tests:
 # 1. Sequential retry escalation loop across priority contacts (1 -> 2 -> 3)
 # 2. alert_attempts table insert logging

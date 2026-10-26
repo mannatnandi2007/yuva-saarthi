@@ -1,4 +1,4 @@
-# YUVAA Saarthi — LLM Service Abstraction
+# Yuva Saarthi — LLM Service Abstraction
 # Reference: PRD §3.2, §3.6 (Hinglish mirroring) & Execution Plan Phase 2
 #
 # ============================================================================
@@ -61,11 +61,11 @@ def get_last_request_provider() -> str:
 
 
 
-YUVAA_COMPANION_SYSTEM_PROMPT = """You are YUVAA Saarthi, a compassionate, emotionally intelligent youth well-being companion created specifically for Indian teens and young adults.
+YUVA_COMPANION_SYSTEM_PROMPT = """You are Yuva Saarthi, a compassionate, emotionally intelligent youth well-being companion created specifically for Indian teens and young adults.
 
 STRICT IDENTITY RULES:
 - Under NO circumstances reveal, mention, or confirm what underlying AI model or company you are built on (NEVER mention Gemini, Google, Groq, Meta, Llama, OpenAI, Anthropic, or ChatGPT).
-- If asked "Who are you?", "What AI are you?", or "Which model?", ALWAYS and ONLY introduce yourself as "YUVAA Saarthi", a confidential companion created to support youth mental health and listen without judgment.
+- If asked "Who are you?", "What AI are you?", or "Which model?", ALWAYS and ONLY introduce yourself as "Yuva Saarthi", a confidential companion created to support youth mental health and listen without judgment.
 
 CRITICAL ANTI-GENERIC GUIDELINES (DO NOT SOUND LIKE A ROBOT):
 - BANNED CLICHES: NEVER use thoughtless generic platitudes like:
@@ -79,6 +79,9 @@ CRITICAL ANTI-GENERIC GUIDELINES (DO NOT SOUND LIKE A ROBOT):
 - NATURAL BILINGUAL MIRRORING: If they speak in Hinglish (e.g. "yaar samajh nahi aa raha", "bohot panic ho raha hai"), speak back in natural, warm, relatable Hinglish (e.g., "Sach mein, jab aisa hota hai toh bohot overwhelming lagta hai..."). If English, reply in gentle, authentic English.
 - LENGTH & PACING: Keep responses conversational and digestible (2 to 4 sentences). Ask one open, thoughtful follow-up question that invites them to unpack what's hurting without feeling interrogated."""
 
+# Backward compatibility alias
+YUVAA_COMPANION_SYSTEM_PROMPT = YUVA_COMPANION_SYSTEM_PROMPT
+
 
 def _sanitize_model_references(text: str) -> str:
     """Ensure no underlying model names or providers leak to the user."""
@@ -90,7 +93,7 @@ def _sanitize_model_references(text: str) -> str:
         r"(?i)\bi was developed by (google|meta|groq|openai|anthropic)\b",
     ]
     for pattern in patterns:
-        sanitized = re.sub(pattern, "I am YUVAA Saarthi", sanitized)
+        sanitized = re.sub(pattern, "I am Yuva Saarthi", sanitized)
     return sanitized.strip()
 
 
@@ -132,15 +135,13 @@ def _call_gemini_chat(
 
         # Resilient multi-model Gemini pool (Fast failover with instant Groq backup)
         ACTIVE_MODELS = [
+            "gemini-2.5-flash",
             "gemini-flash-latest",
-            "gemini-3.8-flash",
-            "gemini-3.1-flash-lite",
-            "gemini-3.1-pro-preview",
         ]
         for model in ACTIVE_MODELS:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
             try:
-                resp = httpx.post(url, json=payload, timeout=httpx.Timeout(1.8, connect=1.0))
+                resp = httpx.post(url, json=payload, timeout=httpx.Timeout(5.0, connect=2.0))
                 if resp.status_code == 200:
                     data = resp.json()
                     candidates = data.get("candidates", [])
@@ -245,7 +246,7 @@ def generate_llm_reply(
 
 
 # ---------------------------------------------------------------------------
-# LangChain LCEL Pipeline for YUVAA Saarthi
+# LangChain LCEL Pipeline for Yuva Saarthi
 # ---------------------------------------------------------------------------
 
 def _execute_multi_provider_llm(input_dict: dict) -> str:
@@ -456,8 +457,8 @@ def _generate_contextual_youth_fallback(message: str, classification) -> str:
     # 8. Greetings & General Inquiries
     if any(k in msg_low for k in ["hi", "hello", "hey", "kaise ho", "kya chal raha", "yo"]):
         if is_hinglish:
-            return "Hey! Main Yusa hoon YUVAA Saarthi se. Kaisa raha aaj ka din? Jo bhi mann mein chal raha ho, bina kisi filter ke share kar sakte ho."
-        return "Hey there! I'm Yusa from YUVAA Saarthi. How has your day been feeling so far? You can share whatever is on your mind — no filter needed."
+            return "Hey! Main Yusa hoon Yuva Saarthi se. Kaisa raha aaj ka din? Jo bhi mann mein chal raha ho, bina kisi filter ke share kar sakte ho."
+        return "Hey there! I'm Yusa from Yuva Saarthi. How has your day been feeling so far? You can share whatever is on your mind — no filter needed."
 
     # 9. Default Empathetic Youth Mirroring
     if is_hinglish:

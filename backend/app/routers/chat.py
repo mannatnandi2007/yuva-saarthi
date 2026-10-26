@@ -1,15 +1,11 @@
-# YUVAA Saarthi — Chat Router
+# Yuva Saarthi — Chat Router
 # Reference: PRD §3.2 (Cross-session memory) & §3.6 (Hinglish mirroring) & Execution Plan Phase 2
 #
-# Endpoints (Phase 2 — new):
+# Endpoints:
 #   POST   /sessions                     — create a new chat session
 #   GET    /sessions                     — list all sessions for current user
 #   POST   /chat                         — send message, get AI response
 #   GET    /chat/history/{session_id}    — fetch message history for a session
-#
-# Legacy stubs (preserved for teammates' reference):
-#   POST   /chat/session/start           — original stub (now superseded)
-#   POST   /chat/message/send            — original stub (now superseded)
 
 import logging
 from fastapi import APIRouter, HTTPException, Depends, status
@@ -36,9 +32,6 @@ from app.services.chat_service import (
     delete_all_sessions,
     delete_sessions_batch,
 )
-
-# Legacy stub imports (kept so old pydantic models still work)
-from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -284,66 +277,4 @@ def chat_history(
     ]
 
 
-# ===========================================================================
-# LEGACY STUBS — preserved for reference, superseded by endpoints above
-# ===========================================================================
 
-class _LegacyChatMessagePayload(BaseModel):
-    session_id: str
-    content: str
-
-
-class _LegacySessionStartPayload(BaseModel):
-    user_id: str
-
-
-@router.post(
-    "/chat/session/start",
-    status_code=status.HTTP_200_OK,
-    deprecated=True,
-    summary="[DEPRECATED] Use POST /sessions instead",
-    include_in_schema=True,
-)
-async def legacy_start_session(payload: _LegacySessionStartPayload):
-    """
-    DEPRECATED — original Day 1 stub.
-    Use POST /sessions (authenticated) instead.
-    TODO: Remove once frontend is updated.
-    """
-    return {
-        "session_id": "dummy-session-uuid",
-        "rolling_summary": "User is feeling thoda anxious regarding upcoming exams but coping well.",
-        "recent_messages": [
-            {"sender": "user", "content": "hi companion"},
-            {"sender": "assistant", "content": "Hello! standard register mirror response"},
-        ],
-        "_note": "DEPRECATED stub. Use POST /sessions with Authorization header.",
-    }
-
-
-@router.post(
-    "/chat/message/send",
-    status_code=status.HTTP_200_OK,
-    deprecated=True,
-    summary="[DEPRECATED] Use POST /chat instead",
-    include_in_schema=True,
-)
-async def legacy_send_message(payload: _LegacyChatMessagePayload):
-    """
-    DEPRECATED — original Day 1 stub.
-    Use POST /chat (authenticated) instead.
-    TODO: Remove once frontend is updated.
-
-    Full pipeline: pre-filter → classify → retrieve (RAG) → respond.
-    (PRD §3.2, §3.3, §3.4, §3.6)
-    """
-    return {
-        "reply": "I understand yaar, it gets overwhelming. Batao, what's on your mind?",
-        "risk_classification": {
-            "severity": "none",
-            "category": "none",
-            "rationale": "Filtered. Chatting normally.",
-        },
-        "action_taken": "logged_only",
-        "_note": "DEPRECATED stub. Use POST /chat with Authorization header.",
-    }

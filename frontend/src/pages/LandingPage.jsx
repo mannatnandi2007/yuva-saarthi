@@ -107,7 +107,7 @@ export default function LandingPage({ onGetStarted, onLogin, onOpenPolicies, onC
                 maxWidth: '640px'
               }}>
                 Board exam pressure, parent expectations, late-night overthinking, or just feeling lonely? 
-                <strong style={{ color: '#2e1065' }}> YUVAA Saarthi</strong> is here for you 24/7. No judgment, no unsolicited lectures — just genuine care and a friendly 3D companion who actually understands you.
+                <strong style={{ color: '#2e1065' }}> Yuva Saarthi</strong> is here for you 24/7. No judgment, no unsolicited lectures — just genuine care and a friendly companion who actually understands you.
               </p>
             </>
           ) : (
@@ -130,7 +130,7 @@ export default function LandingPage({ onGetStarted, onLogin, onOpenPolicies, onC
                 ← Back to Overview
               </button>
               <h2 style={{ fontSize: '1.45rem', fontWeight: '800', color: '#2e1065', margin: '0 0 6px' }}>
-                {authView === 'login' ? "Welcome Back to YUVAA!" : "Say Hi to Yusa ✨"}
+                {authView === 'login' ? "Welcome Back to Yuva Saarthi!" : "Say Hi to Yusa ✨"}
               </h2>
               <p style={{ fontSize: '0.9rem', color: '#581c87', margin: 0, lineHeight: '1.5' }}>
                 {authView === 'login' 
@@ -236,14 +236,14 @@ export default function LandingPage({ onGetStarted, onLogin, onOpenPolicies, onC
         )}
       </section>
 
-      {/* ── RELATABLE FEATURES (What Makes YUVAA Saarthi Different) ── */}
+      {/* ── RELATABLE FEATURES (What Makes Yuva Saarthi Different) ── */}
       <section style={{ padding: '36px 0' }}>
         <div style={{ textAlign: 'center', marginBottom: '34px' }}>
           <h2 style={{ fontSize: '1.9rem', fontWeight: '800', color: '#2e1065' }}>
             Why talking to <span style={{ color: '#db2777' }}>Yusa</span> feels like chatting with a real friend
           </h2>
           <p style={{ color: '#581c87', fontSize: '0.95rem', marginTop: '8px', maxWidth: '600px', margin: '8px auto 0' }}>
-            Traditional mental health apps often feel robotic or clinical. YUVAA Saarthi is designed from the ground up for how Indian students actually talk and feel.
+            Traditional mental health apps often feel robotic or clinical. Yuva Saarthi is designed from the ground up for how Indian students actually talk and feel.
           </p>
         </div>
 
@@ -447,7 +447,7 @@ export default function LandingPage({ onGetStarted, onLogin, onOpenPolicies, onC
 
           <div className="glass-panel" style={{ padding: '20px 24px', background: '#ffffff', border: '1.5px solid #f3e8ff' }}>
             <div style={{ fontWeight: '700', color: '#2e1065', fontSize: '0.98rem' }}>
-              💜 Is YUVAA Saarthi free to use?
+              💜 Is Yuva Saarthi free to use?
             </div>
             <div style={{ fontSize: '0.88rem', color: '#581c87', marginTop: '6px', lineHeight: '1.5' }}>
               Yes, 100% free. Mental well-being support should be accessible to every young person in India.

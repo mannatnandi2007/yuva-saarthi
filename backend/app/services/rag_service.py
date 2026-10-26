@@ -1,4 +1,4 @@
-# YUVAA Saarthi RAG Knowledge & Retrieval Service
+# Yuva Saarthi RAG Knowledge & Retrieval Service
 # Reference: PRD §3.5 (RAG Grounding with WHO / NIMHANS / ICMR) & Execution Plan Day 6
 # Owned by Mannat (Phase 4: Wire RAG Context into Prompt)
 
