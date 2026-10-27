@@ -21,9 +21,9 @@ class Settings(BaseSettings):
     groq_api_key: Optional[str] = None
 
     # LLM Model Configuration (Phase 2)
-    gemini_model: str = "gemini-2.5-flash"
-    gemini_fallback_model: str = "gemini-2.0-flash"
-    groq_model: str = "llama-3.3-70b-versatile"
+    gemini_model: str = "gemini-3.8-flash"
+    gemini_fallback_model: str = "gemini-2.5-flash"
+    groq_model: str = "qwen/qwen3.8-27b"
 
     # Optional Third Provider (OpenAI-compatible)
     enable_third_provider: bool = False

@@ -12,7 +12,7 @@ import re
 import uuid
 import logging
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional, List, Dict
 from dataclasses import dataclass
 from fastapi import HTTPException, status
 
@@ -87,22 +87,20 @@ def get_latest_session_summary(user_id: str) -> Optional[str]:
             user_id, e,
         )
     return None
+# Resilient in-memory session and message store (prevents failures during database connection drops)
+_IN_MEMORY_SESSIONS: Dict[str, dict] = {}
+_IN_MEMORY_MESSAGES: Dict[str, List[dict]] = {}
 
 
 def create_session(user_id: str) -> dict:
     """
-    Insert a new row into the sessions table and return it.
-    Called by POST /sessions.
-
-    Cross-Login Context: before inserting, the most recent previous session's
-    summary_snapshot is fetched and used to seed the new session so the AI
-    remembers past interactions from the very first message (PRD §3.2).
+    Create a new row in the sessions table owned by user_id.
+    Seeds the session with prior rolling summary if available (Cross-Login Context).
+    Maintains an in-memory session registry for offline resilience.
     """
-    # --- Cross-Login Context: fetch prior summary BEFORE inserting ---
     prior_summary = get_latest_session_summary(user_id)
 
     try:
-        # Ensure user exists in users table to satisfy foreign key
         try:
             supabase.table("users").upsert({
                 "id": user_id,
@@ -117,36 +115,43 @@ def create_session(user_id: str) -> dict:
             .execute()
         )
         if not result.data:
-            return {
-                "id": str(uuid.uuid4()),
+            sid = str(uuid.uuid4())
+            row = {
+                "id": sid,
                 "user_id": user_id,
                 "started_at": datetime.now(timezone.utc).isoformat(),
                 "summary_snapshot": prior_summary,
             }
+            _IN_MEMORY_SESSIONS[sid] = row
+            return row
+
         row = result.data[0]
+        sid = str(row["id"])
 
         if prior_summary:
-            new_session_id = str(row["id"])
             from app.services.summary_service import save_session_summary
-            save_session_summary(new_session_id, prior_summary)
+            save_session_summary(sid, prior_summary)
             row["summary_snapshot"] = prior_summary
             logger.info(
                 "[CROSS-LOGIN CONTEXT] Seeded session %s for user %s with prior summary (%d words).",
-                new_session_id, user_id, len(prior_summary.split()),
+                sid, user_id, len(prior_summary.split()),
             )
 
+        _IN_MEMORY_SESSIONS[sid] = row
         return row
     except HTTPException:
         raise
     except Exception as e:
         logger.error("create_session error for user %s: %s", user_id, e)
-        # Always return a valid session for the frontend instead of breaking the app with 500
-        return {
-            "id": str(uuid.uuid4()),
+        sid = str(uuid.uuid4())
+        row = {
+            "id": sid,
             "user_id": user_id,
             "started_at": datetime.now(timezone.utc).isoformat(),
             "summary_snapshot": prior_summary,
         }
+        _IN_MEMORY_SESSIONS[sid] = row
+        return row
 
 
 def generate_chat_heading(summary: Optional[str] = None, first_message: Optional[str] = None) -> str:
@@ -241,6 +246,8 @@ def delete_session(session_id: str, user_id: str) -> bool:
     # 1. Clean in-memory caches
     from app.services.summary_service import _IN_MEMORY_SUMMARIES
     _IN_MEMORY_SUMMARIES.pop(session_id, None)
+    _IN_MEMORY_SESSIONS.pop(session_id, None)
+    _IN_MEMORY_MESSAGES.pop(session_id, None)
 
     if str(session_id).startswith("local-") or session_id in ("default-session", "default"):
         return True
@@ -273,6 +280,8 @@ def delete_all_sessions(user_id: str) -> int:
     """
     from app.services.summary_service import _IN_MEMORY_SUMMARIES
     _IN_MEMORY_SUMMARIES.clear()
+    _IN_MEMORY_SESSIONS.clear()
+    _IN_MEMORY_MESSAGES.clear()
 
     try:
         # Fetch user's session IDs
@@ -358,6 +367,7 @@ def validate_session_ownership(session_id: str, user_id: str) -> dict:
     if str(session_id).startswith("local-") or session_id in ("default-session", "default"):
         return {"id": session_id, "user_id": user_id, "summary_snapshot": None}
 
+    session = None
     try:
         result = (
             supabase.table("sessions")
@@ -369,16 +379,40 @@ def validate_session_ownership(session_id: str, user_id: str) -> dict:
         session = result.data
     except Exception as e:
         logger.warning("validate_session_ownership lookup failed: %s", e)
+        # If DB query failed (e.g. offline / DNS failure / table error), check in-memory store
+        if session_id in _IN_MEMORY_SESSIONS:
+            sess = _IN_MEMORY_SESSIONS[session_id]
+            if str(sess.get("user_id")) != str(user_id):
+                logger.warning(
+                    "Ownership violation: user %s attempted to access session %s owned by %s",
+                    user_id, session_id, sess.get("user_id")
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You do not have access to this session.",
+                )
+            return sess
+
         err_str = str(e)
         # If network error or invalid UUID syntax, allow session without crashing
         if "ConnectError" in type(e).__name__ or "getaddrinfo" in err_str or "invalid input syntax for type uuid" in err_str:
-            return {"id": session_id, "user_id": user_id, "summary_snapshot": None}
+            fallback = {"id": session_id, "user_id": user_id, "summary_snapshot": None}
+            _IN_MEMORY_SESSIONS[session_id] = fallback
+            return fallback
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Session not found.",
         )
 
     if not session:
+        if session_id in _IN_MEMORY_SESSIONS:
+            sess = _IN_MEMORY_SESSIONS[session_id]
+            if str(sess.get("user_id")) != str(user_id):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You do not have access to this session.",
+                )
+            return sess
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Session not found.",
@@ -394,6 +428,7 @@ def validate_session_ownership(session_id: str, user_id: str) -> dict:
             detail="You do not have access to this session.",
         )
 
+    _IN_MEMORY_SESSIONS[session_id] = session
     return session
 
 
@@ -434,7 +469,9 @@ def save_message(
         result = supabase.table("messages").insert(payload).execute()
         if not result.data:
             raise Exception("No data returned from messages insert")
-        return result.data[0]
+        msg = result.data[0]
+        _IN_MEMORY_MESSAGES.setdefault(session_id, []).append(msg)
+        return msg
     except Exception as e:
         err_str = str(e).lower()
         if ("mood" in payload or "mood_confidence" in payload) and "column" in err_str:
@@ -443,11 +480,19 @@ def save_message(
             try:
                 res = supabase.table("messages").insert(fallback_payload).execute()
                 if res.data:
-                    return {**res.data[0], **{k: v for k, v in payload.items() if k in ("mood", "mood_confidence")}}
+                    msg = {**res.data[0], **{k: v for k, v in payload.items() if k in ("mood", "mood_confidence")}}
+                    _IN_MEMORY_MESSAGES.setdefault(session_id, []).append(msg)
+                    return msg
             except Exception:
                 pass
         logger.warning("save_message error for session %s sender %s: %s (using local fallback)", session_id, sender, e)
-        return {"id": str(uuid.uuid4()), **payload}
+        msg = {
+            "id": str(uuid.uuid4()),
+            **payload,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        _IN_MEMORY_MESSAGES.setdefault(session_id, []).append(msg)
+        return msg
 
 
 def _log_risk_event(
@@ -500,7 +545,10 @@ def get_message_history(session_id: str, user_id: str) -> List[dict]:
             .order("created_at", desc=False)
             .execute()
         )
-        return result.data or []
+        rows = result.data or []
+        if rows:
+            return rows
+        return _IN_MEMORY_MESSAGES.get(session_id, [])
     except Exception as e:
         err_str = str(e).lower()
         if "column" in err_str and "mood" in err_str:
@@ -512,16 +560,12 @@ def get_message_history(session_id: str, user_id: str) -> List[dict]:
                     .order("created_at", desc=False)
                     .execute()
                 )
-                return result.data or []
+                if result.data:
+                    return result.data
             except Exception:
                 pass
-        logger.error("get_message_history error for session %s: %s", session_id, e)
-        if "ConnectError" in type(e).__name__ or "getaddrinfo" in err_str:
-            return []
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not retrieve chat history.",
-        )
+        logger.warning("get_message_history error for session %s: %s (using local memory)", session_id, e)
+        return _IN_MEMORY_MESSAGES.get(session_id, [])
 
 
 # ---------------------------------------------------------------------------
