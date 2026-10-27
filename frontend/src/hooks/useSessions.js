@@ -50,7 +50,13 @@ export function useSessions() {
       });
 
       // Backend returns list of sessions with messages >= 1
-      const list = Array.isArray(res.data) ? res.data : (res.data?.sessions || []);
+      const rawList = Array.isArray(res.data) ? res.data : (res.data?.sessions || []);
+      const list = rawList.map((s) => ({
+        ...s,
+        id: s.session_id || s.id,
+        title: s.heading || s.title || 'Conversation',
+        updated_at: s.started_at || s.updated_at || s.created_at,
+      }));
       setSessions(list);
 
       // If currentSessionId is set but not in list, keep it if it was a freshly created one
@@ -83,10 +89,16 @@ export function useSessions() {
     try {
       const res = await apiClient.post('/sessions', { title });
       const newSession = res.data;
-      if (newSession?.id) {
-        setSessions((prev) => [newSession, ...prev]);
-        persistSessionId(newSession.id);
-        return newSession.id;
+      const sid = newSession?.session_id || newSession?.id;
+      if (sid) {
+        const normalized = {
+          ...newSession,
+          id: sid,
+          title: newSession?.heading || title,
+        };
+        setSessions((prev) => [normalized, ...prev]);
+        persistSessionId(sid);
+        return sid;
       }
     } catch (err) {
       console.error('Failed to create session:', err);

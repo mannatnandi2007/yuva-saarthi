@@ -286,4 +286,18 @@ def chat_history(
     ]
 
 
+@router.get(
+    "/sessions/{session_id}/messages",
+    response_model=List[MessageHistoryItem],
+    status_code=status.HTTP_200_OK,
+    summary="Get message history for a session (alias)",
+)
+def session_messages(
+    session_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Alias for /chat/history/{session_id} to ensure seamless REST compatibility."""
+    return chat_history(session_id=session_id, current_user=current_user)
+
+
 

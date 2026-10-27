@@ -86,10 +86,7 @@ def get_my_contacts(
         )
         contacts = result.data or []
     except Exception as e:
-        logger.error("get_my_contacts DB error for user %s: %s", current_user.user_id, e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not retrieve contacts.",
-        )
+        logger.warning("get_my_contacts DB unreachable for user %s: %s (returning empty list)", current_user.user_id, e)
+        contacts = []
 
     return [ContactResponse(**c) for c in contacts]

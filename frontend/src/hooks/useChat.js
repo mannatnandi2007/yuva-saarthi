@@ -113,7 +113,7 @@ export function useChat({ currentSessionId, onSessionCreated, onSessionsRefresh 
           const createRes = await apiClient.post('/sessions', {
             title: trimmed.slice(0, 30) || 'New Conversation',
           });
-          targetSessionId = createRes.data?.id;
+          targetSessionId = createRes.data?.session_id || createRes.data?.id;
           if (onSessionCreated && targetSessionId) {
             onSessionCreated(targetSessionId);
           }
