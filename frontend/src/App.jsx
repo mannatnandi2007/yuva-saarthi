@@ -14,6 +14,9 @@ import PoliciesPage from './pages/PoliciesPage.jsx';
 import useTheme from './hooks/useTheme.js';
 import { Shield, Users, LogOut, MessageCircle, Home } from 'lucide-react';
 import apiClient, { pingBackendWarmup } from './api/client.js';
+import { storage } from './utils/storage.js';
+import { App as CapApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 
 export default function App() {
   // Enforce system default theme (dark if system/browser is dark, light if light)
@@ -21,7 +24,7 @@ export default function App() {
 
   const [userSession, setUserSession] = useState(() => {
     try {
-      const saved = localStorage.getItem('user_session') || localStorage.getItem('yuvaa_user_session');
+      const saved = storage.getSync('user_session') || storage.getSync('yuvaa_user_session');
       return saved ? JSON.parse(saved) : null;
     } catch (e) {
       return null;
@@ -30,7 +33,7 @@ export default function App() {
 
   const [currentPage, setCurrentPage] = useState(() => {
     try {
-      const saved = localStorage.getItem('user_session') || localStorage.getItem('yuvaa_user_session');
+      const saved = storage.getSync('user_session') || storage.getSync('yuvaa_user_session');
       return saved ? 'chat' : 'landing';
     } catch (e) {
       return 'landing';
@@ -41,6 +44,28 @@ export default function App() {
   const [hasReadPolicies, setHasReadPolicies] = useState(false);
   const [warmupStatus, setWarmupStatus] = useState('checking');
 
+  // Android hardware back button handler (Capacitor native integration)
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      const backListener = CapApp.addListener('backButton', ({ canGoBack }) => {
+        setCurrentPage((current) => {
+          if (current === 'policies' || current === 'signup' || current === 'consent' || current === 'otp') {
+            return 'landing';
+          }
+          if (canGoBack) {
+            window.history.back();
+          } else {
+            CapApp.exitApp();
+          }
+          return current;
+        });
+      });
+      return () => {
+        backListener.then((h) => h.remove());
+      };
+    }
+  }, []);
+
   // Ping backend on app boot to wake up cold-start server
   useEffect(() => {
     pingBackendWarmup((status) => {
@@ -48,15 +73,14 @@ export default function App() {
     });
   }, []);
 
-  // Sync user session to localStorage
+  // Sync user session to storage
   useEffect(() => {
     if (userSession) {
-      const serialized = JSON.stringify(userSession);
-      localStorage.setItem('user_session', serialized);
-      localStorage.setItem('yuvaa_user_session', serialized);
+      storage.setItem('user_session', userSession);
+      storage.setItem('yuvaa_user_session', userSession);
     } else {
-      localStorage.removeItem('user_session');
-      localStorage.removeItem('yuvaa_user_session');
+      storage.removeItem('user_session');
+      storage.removeItem('yuvaa_user_session');
     }
   }, [userSession]);
 
@@ -84,8 +108,8 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('user_session');
-    localStorage.removeItem('yuvaa_user_session');
+    storage.removeItem('user_session');
+    storage.removeItem('yuvaa_user_session');
     setUserSession(null);
     setCurrentPage('landing');
   };

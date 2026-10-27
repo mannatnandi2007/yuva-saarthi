@@ -4,6 +4,7 @@
  */
 
 import axios from 'axios';
+import { storage } from '../utils/storage.js';
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -18,7 +19,7 @@ export const apiClient = axios.create({
 // Attach token and user context dynamically on every request
 apiClient.interceptors.request.use((config) => {
   try {
-    const rawSession = localStorage.getItem('user_session') || localStorage.getItem('supabase.auth.token');
+    const rawSession = storage.getSync('user_session') || storage.getSync('supabase.auth.token');
     if (rawSession) {
       const parsed = typeof rawSession === 'string' && rawSession.startsWith('{')
         ? JSON.parse(rawSession)
