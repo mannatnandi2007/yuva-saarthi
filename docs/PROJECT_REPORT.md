@@ -268,6 +268,14 @@ ENABLE_DEMO_ROUTES=false
 
 ## 11. Changelog
 
+* **v2.3.0 (Phase 4 Session Management & History Polish):**
+  * Implemented lazy session creation: DB rows are never created on mount or "New Chat" click until the first message is sent.
+  * Banned fake local IDs (`local-...`, `default-session`): all sessions enforce real UUIDs returned by backend.
+  * Added resilient frontend API client (`frontend/src/api/client.js`) with auth interceptor and startup cold-start health ping (`pingBackendWarmup`).
+  * Added session history grouping in sidebar by date: Today, Yesterday, This Week, and Earlier, with a friendly empty state.
+  * Added rapid session switching protection via `AbortController` in history loading.
+  * Added `limit` and `offset` query parameters to `GET /sessions`.
+  * Added dedicated Phase 4 session unit test suite (`test_phase4_sessions.py`).
 * **v2.2.0 (Phase 3 Backend Mood Engine & Persistence):**
   * Added `mood` and `mood_confidence` columns to `messages` table via Supabase migration `20261027000000_add_mood_column.sql`.
   * Added `MoodEnum` (`normal`, `happy`, `overjoyed`, `sad`, `angry`, `anxious`, `tired`) to backend schemas.

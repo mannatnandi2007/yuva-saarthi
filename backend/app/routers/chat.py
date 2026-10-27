@@ -8,8 +8,8 @@
 #   GET    /chat/history/{session_id}    — fetch message history for a session
 
 import logging
-from fastapi import APIRouter, HTTPException, Depends, status
-from typing import List
+from fastapi import APIRouter, HTTPException, Depends, status, Query
+from typing import List, Optional
 from datetime import datetime
 
 from app.dependencies import get_current_user, AuthenticatedUser
@@ -74,15 +74,18 @@ def start_session(
     summary="List all sessions for the authenticated user",
 )
 def get_sessions(
+    limit: Optional[int] = Query(50, ge=1, le=100, description="Max number of sessions to return"),
+    offset: Optional[int] = Query(0, ge=0, description="Pagination offset"),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     """
     Return all chat sessions belonging to the current user, newest first.
+    Supports limit and offset pagination (Phase 4).
 
     Only the authenticated user's own sessions are returned — no cross-user
     leakage is possible since filtering is always by user_id from the token.
     """
-    rows = list_sessions(user_id=current_user.user_id)
+    rows = list_sessions(user_id=current_user.user_id, limit=limit, offset=offset)
     return [
         SessionListItem(
             session_id=str(r["id"]),

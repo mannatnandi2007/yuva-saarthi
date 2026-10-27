@@ -200,10 +200,10 @@ def generate_chat_heading(summary: Optional[str] = None, first_message: Optional
     return "Safe Space Chat"
 
 
-def list_sessions(user_id: str) -> List[dict]:
+def list_sessions(user_id: str, limit: int = 50, offset: int = 0) -> List[dict]:
     """
     Return all sessions belonging to user_id, newest first.
-    Enriched with human-friendly 'heading'.
+    Enriched with human-friendly 'heading' and supports limit/offset pagination (Phase 4).
     Called by GET /sessions.
     """
     try:
@@ -215,6 +215,9 @@ def list_sessions(user_id: str) -> List[dict]:
             .execute()
         )
         rows = result.data or []
+        if offset > 0 or len(rows) > limit:
+            rows = rows[offset:offset + limit]
+
         for r in rows:
             snapshot = r.get("summary_snapshot")
             r["heading"] = generate_chat_heading(summary=snapshot)

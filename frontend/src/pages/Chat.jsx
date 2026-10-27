@@ -11,8 +11,43 @@ import {
 import axios from 'axios';
 import BrainLogo from '../components/BrainLogo.jsx';
 import YusaCompanion from '../components/YusaCompanion.jsx';
+import { pingBackendWarmup } from '../api/client.js';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+function groupSessionsByDate(sessions) {
+  const groups = {
+    today: [],
+    yesterday: [],
+    thisWeek: [],
+    earlier: []
+  };
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfYesterday = startOfToday - 86400000;
+  const startOfThisWeek = startOfToday - 7 * 86400000;
+
+  (sessions || []).forEach((s) => {
+    const time = s.started_at ? new Date(s.started_at).getTime() : 0;
+    if (time >= startOfToday) {
+      groups.today.push(s);
+    } else if (time >= startOfYesterday) {
+      groups.yesterday.push(s);
+    } else if (time >= startOfThisWeek) {
+      groups.thisWeek.push(s);
+    } else {
+      groups.earlier.push(s);
+    }
+  });
+
+  return [
+    { label: 'Today', items: groups.today },
+    { label: 'Yesterday', items: groups.yesterday },
+    { label: 'This Week', items: groups.thisWeek },
+    { label: 'Earlier', items: groups.earlier }
+  ].filter((g) => g.items.length > 0);
+}
 
 const SUGGESTED_PROMPTS = [
   { 
@@ -77,6 +112,8 @@ export default function Chat({
 
   // Phase 3: Backend-driven mood state with emotion smoothing
   const [currentMood, setCurrentMood] = useState("NORMAL");
+  const [backendStatus, setBackendStatus] = useState("ready");
+  const abortControllerRef = useRef(null);
 
     /* ===========================
       PHASE 6 HELPERS
@@ -180,55 +217,46 @@ export default function Chat({
     return headers;
   };
 
-  // Initialize fresh chat on startup
+  // Initialize fresh chat and ping backend on startup (Phase 4)
   useEffect(() => {
+    let isMounted = true;
     const initChat = async () => {
-      const headers = getAuthHeaders();
+      pingBackendWarmup((status) => {
+        if (isMounted) setBackendStatus(status);
+      });
 
-      // Fetch session history for sidebar
+      const headers = getAuthHeaders();
       try {
-        const listRes = await axios.get(`${API_BASE_URL}/sessions`, { headers, timeout: 3000 });
-        if (Array.isArray(listRes.data)) {
+        const listRes = await axios.get(`${API_BASE_URL}/sessions`, { headers, timeout: 5000 });
+        if (isMounted && Array.isArray(listRes.data)) {
           setSessionsList(listRes.data);
         }
       } catch (err) {
-        console.debug("Could not fetch sessions list; local fallback active.");
+        console.debug("Could not fetch sessions list:", err);
       }
 
-      await createNewChat();
+      if (isMounted) {
+        createNewChat();
+      }
     };
 
     initChat();
+    return () => {
+      isMounted = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [userSession]);
 
-  const createNewChat = async () => {
-    setIsLoading(true);
+  // Phase 4: Lazy session creation — do NOT create session row in DB until first message is sent
+  const createNewChat = () => {
     setActiveHelplines([]);
     setActiveSafeguard(null);
     setMessages([]);
-
-    try {
-      const headers = getAuthHeaders();
-      const res = await axios.post(`${API_BASE_URL}/sessions`, {}, { headers, timeout: 3000 });
-      if (res.data?.session_id) {
-        const newId = res.data.session_id;
-        setActiveSessionId(newId);
-        setSessionsList(prev => [
-          { session_id: newId, started_at: new Date().toISOString(), heading: "New Safe Chat", title: "New Safe Chat" },
-          ...prev.filter(s => s.session_id !== newId)
-        ]);
-      }
-    } catch (err) {
-      const fallbackId = 'local-' + Date.now();
-      setActiveSessionId(fallbackId);
-      setSessionsList(prev => [
-        { session_id: fallbackId, started_at: new Date().toISOString(), heading: "New Safe Chat", title: "New Safe Chat" },
-        ...prev
-      ]);
-    } finally {
-      setIsLoading(false);
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
+    setActiveSessionId(null);
+    setCurrentMood("NORMAL");
+    setTimeout(() => inputRef.current?.focus(), 100);
   };
 
   const handleDeleteSession = async (sessionId, e) => {
@@ -281,8 +309,16 @@ export default function Chat({
 
  
 
+  // Phase 4: Session loading with AbortController for rapid switching
   const loadSession = async (sessionId) => {
     if (sessionId === activeSessionId) return;
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setIsLoading(true);
     setActiveSessionId(sessionId);
     setActiveHelplines([]);
@@ -290,7 +326,11 @@ export default function Chat({
 
     try {
       const headers = getAuthHeaders();
-      const res = await axios.get(`${API_BASE_URL}/chat/history/${sessionId}`, { headers, timeout: 4000 });
+      const res = await axios.get(`${API_BASE_URL}/chat/history/${sessionId}`, {
+        headers,
+        timeout: 8000,
+        signal: controller.signal
+      });
       if (Array.isArray(res.data) && res.data.length > 0) {
         setMessages(res.data.map(m => ({
           sender: m.sender,
@@ -309,6 +349,9 @@ export default function Chat({
         setCurrentMood("NORMAL");
       }
     } catch (err) {
+      if (axios.isCancel(err)) {
+        return;
+      }
       setMessages([]);
       setCurrentMood("NORMAL");
     } finally {
@@ -324,13 +367,50 @@ export default function Chat({
     setMessages(prev => [...prev, userMessage]);
     if (!textOverride) setInputText('');
     setIsLoading(true);
-    setTypingStage("Understanding your message...");
+
+    const headers = getAuthHeaders();
+    let currentSessionId = activeSessionId;
+
+    // Phase 4: Lazy session creation on first message
+    if (!currentSessionId) {
+      setTypingStage("Creating safe space...");
+      try {
+        const sessionRes = await axios.post(`${API_BASE_URL}/sessions`, {}, { headers, timeout: 8000 });
+        if (sessionRes.data?.session_id) {
+          currentSessionId = sessionRes.data.session_id;
+          setActiveSessionId(currentSessionId);
+          setSessionsList(prev => [
+            {
+              session_id: currentSessionId,
+              started_at: new Date().toISOString(),
+              heading: "Safe Space Chat",
+              title: "Safe Space Chat"
+            },
+            ...prev.filter(s => s.session_id !== currentSessionId)
+          ]);
+        } else {
+          throw new Error("No session_id returned from /sessions");
+        }
+      } catch (sessErr) {
+        console.error("Failed to lazily create session:", sessErr);
+        setIsLoading(false);
+        setTypingStage("");
+        setMessages(prev => [
+          ...prev,
+          {
+            sender: "assistant",
+            content: "Could not establish secure session. Please check your connection and try again."
+          }
+        ]);
+        return;
+      }
+    }
+
+    setTypingStage("Thinking carefully...");
 
     try {
-      const headers = getAuthHeaders();
-      setTypingStage("Thinking carefully...");
       const response = await axios.post(`${API_BASE_URL}/chat`, {
-        session_id: activeSessionId || 'default-session',
+        session_id: currentSessionId,
         message: textToSend.trim()
       }, { headers, timeout: 45000 });
 
@@ -364,12 +444,11 @@ export default function Chat({
       });
 
       setFollowUpQuestion(generateFollowUpQuestion(effectiveMood));
-
       updateConversationSummary(updatedMessages);
 
       if (data.heading) {
         setSessionsList(prev => prev.map(s => 
-          s.session_id === activeSessionId ? { ...s, heading: data.heading, title: data.heading } : s
+          s.session_id === currentSessionId ? { ...s, heading: data.heading, title: data.heading } : s
         ));
       }
 
@@ -410,7 +489,7 @@ export default function Chat({
       ]);
 
     } finally {
-      setTypingStage("");      // ← ADD THIS LINE
+      setTypingStage("");
       setIsLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
     }
@@ -486,83 +565,105 @@ export default function Chat({
           </div>
 
           {/* Sessions List */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto', flex: 1 }}>
-            {sessionsList.map((s) => {
-              const isActive = s.session_id === activeSessionId;
-              const displayHeading = s.heading || s.title || (s.summary_snapshot ? s.summary_snapshot.replace(/^Heading:\s*/, '').slice(0, 26) + '...' : `Chat ${s.session_id.slice(0, 6)}`);
-              return (
-                <div
-                  key={s.session_id}
-                  onClick={() => loadSession(s.session_id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '10px 12px',
-                    borderRadius: '12px',
-                    border: 'none',
-                    background: isActive ? 'rgba(167, 139, 250, 0.12)' : 'transparent',
-                    color: isActive ? '#1e293b' : '#64748b',
-                    cursor: 'pointer',
-                    fontSize: '0.84rem',
-                    transition: 'all 0.15s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.background = 'rgba(167, 139, 250, 0.06)';
-                      e.currentTarget.style.color = '#475569';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.color = '#64748b';
-                    }
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden', flex: 1, minWidth: 0 }}>
-                    <MessageSquare size={15} color={isActive ? '#818cf8' : '#94a3b8'} style={{ flexShrink: 0 }} />
-                    <div style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: isActive ? '600' : '400', display: 'block' }}>
-                        {displayHeading}
-                      </span>
-                      {s.started_at && (
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block', marginTop: '2px' }}>
-                          {new Date(s.started_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                        </span>
-                      )}
-                    </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', flex: 1 }}>
+            {sessionsList.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '28px 12px', color: '#94a3b8', fontSize: '0.82rem' }}>
+                <MessageSquare size={22} style={{ margin: '0 auto 8px', opacity: 0.45, display: 'block' }} />
+                <p style={{ margin: 0, fontWeight: 500, color: '#64748b' }}>No conversations yet</p>
+                <p style={{ margin: '4px 0 0', fontSize: '0.74rem', opacity: 0.8 }}>Send a message to start your safe space.</p>
+              </div>
+            ) : (
+              groupSessionsByDate(sessionsList).map((group) => (
+                <div key={group.label} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                  <div style={{
+                    fontSize: '0.66rem',
+                    fontWeight: 700,
+                    color: '#94a3b8',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    padding: '4px 8px 2px'
+                  }}>
+                    {group.label}
                   </div>
-                  <button
-                    onClick={(e) => handleDeleteSession(s.session_id, e)}
-                    title="Delete this conversation"
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      padding: '4px',
-                      cursor: 'pointer',
-                      color: 'var(--text-muted)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderRadius: '4px',
-                      opacity: isActive ? 0.8 : 0.4,
-                      transition: 'all 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.color = 'var(--accent-crimson)';
-                      e.currentTarget.style.opacity = '1';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.color = 'var(--text-muted)';
-                      e.currentTarget.style.opacity = isActive ? '0.8' : '0.4';
-                    }}
-                  >
-                    <Trash2 size={13} />
-                  </button>
+                  {group.items.map((s) => {
+                    const isActive = s.session_id === activeSessionId;
+                    const displayHeading = s.heading || s.title || (s.summary_snapshot ? s.summary_snapshot.replace(/^Heading:\s*/, '').slice(0, 26) + '...' : `Chat ${s.session_id.slice(0, 6)}`);
+                    return (
+                      <div
+                        key={s.session_id}
+                        onClick={() => loadSession(s.session_id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '9px 12px',
+                          borderRadius: '12px',
+                          border: 'none',
+                          background: isActive ? 'rgba(167, 139, 250, 0.12)' : 'transparent',
+                          color: isActive ? '#1e293b' : '#64748b',
+                          cursor: 'pointer',
+                          fontSize: '0.84rem',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.background = 'rgba(167, 139, 250, 0.06)';
+                            e.currentTarget.style.color = '#475569';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.color = '#64748b';
+                          }
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden', flex: 1, minWidth: 0 }}>
+                          <MessageSquare size={14} color={isActive ? '#818cf8' : '#94a3b8'} style={{ flexShrink: 0 }} />
+                          <div style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: isActive ? '600' : '400', display: 'block' }}>
+                              {displayHeading}
+                            </span>
+                            {s.started_at && (
+                              <span style={{ fontSize: '0.67rem', color: '#94a3b8', display: 'block', marginTop: '1px' }}>
+                                {new Date(s.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => handleDeleteSession(s.session_id, e)}
+                          title="Delete this conversation"
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            padding: '4px',
+                            cursor: 'pointer',
+                            color: 'var(--text-muted)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '4px',
+                            opacity: isActive ? 0.8 : 0.4,
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = 'var(--accent-crimson)';
+                            e.currentTarget.style.opacity = '1';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = 'var(--text-muted)';
+                            e.currentTarget.style.opacity = isActive ? '0.8' : '0.4';
+                          }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              ))
+            )}
           </div>
 
           {/* Sidebar Footer Controls */}
@@ -642,36 +743,56 @@ export default function Chat({
             </div>
           </div>
 
-          {activeSessionId && (
-            <button
-              onClick={(e) => handleDeleteSession(activeSessionId, e)}
-              style={{
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {backendStatus === 'warming' && (
+              <div style={{
+                background: 'rgba(245, 158, 11, 0.1)',
+                color: '#d97706',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                borderRadius: '16px',
+                padding: '3px 10px',
+                fontSize: '0.72rem',
+                fontWeight: 500,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '5px 10px',
-                background: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                borderRadius: 'var(--radius-pill)',
-                color: '#ef4444',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-              title="Delete current conversation"
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
-                e.currentTarget.style.borderColor = '#ef4444';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
-              }}
-            >
-              <Trash2 size={12} />
-              <span>Delete Chat</span>
-            </button>
-          )}
+                gap: '6px'
+              }}>
+                <Loader2 size={12} className="animate-spin" />
+                <span>Warming up safe server...</span>
+              </div>
+            )}
+
+            {activeSessionId && (
+              <button
+                onClick={(e) => handleDeleteSession(activeSessionId, e)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '5px 10px',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  borderRadius: 'var(--radius-pill)',
+                  color: '#ef4444',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                title="Delete current conversation"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                  e.currentTarget.style.borderColor = '#ef4444';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+                }}
+              >
+                <Trash2 size={12} />
+                <span>Delete Chat</span>
+              </button>
+            )}
+          </div>
         </header>
 
         {/* ── CHAT VIEWPORT WITH DYNAMIC ENVIRONMENT (Task 2) ── */}
