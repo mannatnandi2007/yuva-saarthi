@@ -75,75 +75,8 @@ export default function Chat({
   const inputRef = useRef(null);
   const chatSectionRef = useRef(null);
 
-  // Mood Detection Logic
-  const detectMood = (messages) => {
-    const recentUserMsgs = messages.filter(m => m.sender === 'user').slice(-3);
-    if (recentUserMsgs.length === 0) return 'NORMAL';
-
-    const dictionaries = {
-      VERY_SCARED: ['suicide', 'kill myself', 'self harm', 'die', 'want to die', 'end my life', 'cut myself', 'don\'t want to live', 'no reason to live', 'better off dead', 'suicidal', 'self-harm', 'harm myself'],
-      HAPPY: ['happy', 'happier', 'joyful', 'glad', 'cheerful', 'excited', 'great', 'good', 'amazing', 'wonderful', 'fantastic', 'awesome', 'positive', 'peaceful', 'content', 'satisfied', 'relieved', 'feeling good', 'feeling better', 'feeling great', 'made my day', 'best day', 'so happy', 'really happy', 'pretty happy', "i'm doing good", 'things are going well', 'khush', 'bahut khush', 'bohot khush', 'aaj khush hoon', 'mann khush hai', 'dil khush hai', 'acha lag raha hai', 'accha lag raha hai', 'bahut acha lag raha hai', 'bohot acha lag raha hai', 'mast', 'ekdum mast', 'sab badhiya', 'sab badiya', 'sahi hai', 'maza aa raha hai', 'kaafi acha', 'relaxed hoon', 'sukoon hai', 'aaj mood acha hai'],
-      OVERJOYED: ['overjoyed', 'extremely happy', 'extremely excited', 'thrilled', 'ecstatic', 'delighted', 'elated', 'on top of the world', 'best day ever', 'so excited', 'super happy', 'really excited', "can't believe it", 'this is amazing', "i'm so happy", "i'm extremely happy", 'bahut zyada khush', 'bohot zyada khush', 'ekdum khush', 'bahut excited', 'bohot excited', 'aaj toh maza aa gaya', 'dil garden garden', 'aaj toh kamaal ho gaya', 'kya mast din hai', 'bahut hi acha', 'bohot hi acha', 'life mast chal rahi hai'],
-      SAD: ['sad', 'unhappy', 'upset', 'crying', 'cried', 'tears', 'hurt', 'heartbroken', 'depressed', 'miserable', 'down', 'low', 'hopeless', 'disappointed', 'broken', 'empty', 'nothing feels good', 'feel terrible', 'feel horrible', 'i feel bad', 'i feel sad', 'i want to cry', 'feeling low', 'feeling down', 'lost', 'emotionally drained', 'dukhi', 'udaas', 'bahut dukhi', 'bohot dukhi', 'mann udaas hai', 'dil udaas hai', 'rona aa raha hai', 'ro raha hoon', 'ro rahi hoon', 'aankhon mein aansu', 'dil toot gaya', 'andar se toot gaya', 'bahut bura lag raha hai', 'bohot bura lag raha hai', 'mann nahi lag raha', 'kuch acha nahi lag raha', 'akela feel ho raha hai', 'andar se khali lag raha hai', 'low feel ho raha hai', 'mood off hai'],
-      ANGRY: ['angry', 'mad', 'furious', 'annoyed', 'irritated', 'frustrated', 'rage', 'enraged', 'pissed', 'fed up', 'hate this', 'so angry', 'really angry', 'very angry', "can't control my anger", "i'm furious", 'this makes me angry', "i'm frustrated", 'gussa', 'gusse mein', 'bahut gussa', 'bohot gussa', 'gussa aa raha hai', 'gussa chadh raha hai', 'dimag kharab', 'dimag garam', 'pak gaya hoon', 'pak chuka hoon', 'irritate ho raha hoon', 'irritated hoon', 'frustrate ho gaya', 'frustrated hoon', 'bahut irritate', 'bohot irritate', 'mann kar raha hai chillane ka', 'bahut chidh ho rahi hai', 'chidh raha hoon'],
-      ANXIOUS: ['anxious', 'anxiety', 'anxious about', 'worried', 'worry', 'worrying', 'nervous', 'stressed', 'stress', 'panic', 'panicking', 'overthinking', 'restless', 'uneasy', 'tense', 'scared about the future', "can't stop thinking", "can't calm down", 'feeling stressed', 'feeling anxious', "i'm worried", "i'm nervous", "i'm panicking", "my mind won't stop", 'tension', 'tension ho rahi hai', 'tension mein hoon', 'bahut tension', 'bohot tension', 'chinta', 'chinta ho rahi hai', 'pareshan', 'bahut pareshan', 'bohot pareshan', 'ghabrahat', 'ghabra raha hoon', 'ghabrahat ho rahi hai', 'dar lag raha hai', 'overthinking ho rahi hai', 'bahut overthink kar raha hoon', 'dimag ruk nahi raha', 'dimag mein bahut kuch chal raha hai', 'chain nahi hai', 'restless hoon', 'stress ho raha hai', 'stress mein hoon'],
-      SCARED: ['scared', 'afraid', 'frightened', 'terrified', 'fear', 'fearful', 'i am scared', "i'm afraid", "i'm terrified", "i'm really scared", 'something bad will happen', "i don't feel safe", "i'm afraid of", "i'm frightened", 'dar', 'dar lag raha hai', 'bahut dar lag raha hai', 'bohot dar lag raha hai', 'darr gaya', 'darr gayi', 'bahut darr gaya', 'ghabra raha hoon', 'mujhe dar lag raha hai', 'safe feel nahi ho raha', 'mujhe khauf lag raha hai', 'bahut ghabrahat hai'],
-      LONELY: ['lonely', 'alone', 'isolated', 'nobody understands me', 'no one understands me', 'no one is there', 'i have nobody', 'i feel alone', 'i feel lonely', 'feeling isolated', 'no one cares', 'nobody cares', 'i have no friends', 'i need someone', 'i want company', 'akela', 'akeli', 'akela feel ho raha hai', 'akeli feel ho rahi hai', 'bahut akela', 'bohot akela', 'koi nahi hai', 'mere saath koi nahi hai', 'koi samajhta nahi', 'mujhe koi nahi samajhta', 'kisi se baat nahi hoti', 'baat karne wala koi nahi', 'koi care nahi karta', 'sabse door ho gaya hoon', 'bahut lonely feel ho raha hai'],
-      TIRED: ['tired', 'exhausted', 'drained', 'sleepy', 'fatigued', 'burnt out', 'burned out', 'no energy', 'low energy', "can't focus", 'mentally exhausted', 'emotionally exhausted', 'physically exhausted', 'i need rest', 'i need sleep', "i'm exhausted", "i'm so tired", 'thak gaya', 'thak gayi', 'bahut thak gaya', 'bohot thak gaya', 'thak chuka hoon', 'energy nahi hai', 'bilkul energy nahi', 'dimag thak gaya', 'mentally tired', 'bahut exhaustion hai', 'neend aa rahi hai', 'so jaana hai', 'rest chahiye', 'break chahiye', 'dimaag kaam nahi kar raha', 'bilkul drained hoon'],
-      CONFUSED: ['confused', 'confusing', "don't understand", "i don't know", "i don't know what to do", 'overwhelmed', 'too much', 'too many things', "can't handle everything", 'everything is happening at once', 'my head is full', 'my mind is overloaded', 'i feel lost', "i don't know what i'm doing", "can't decide", 'unable to decide', 'stuck', 'i feel stuck', 'confuse hoon', 'confused ho gaya', 'samajh nahi aa raha', 'kuch samajh nahi aa raha', 'kya karu samajh nahi aa raha', 'bahut kuch ho raha hai', 'sab kuch ek saath ho raha hai', 'bahut load hai', 'dimaag mein bahut load hai', 'handle nahi ho raha', 'sab handle nahi ho raha', 'kahan se start karu', 'decision nahi le paa raha', 'decision nahi le paa rahi', 'atak gaya hoon', 'stuck hoon', 'lost feel ho raha hai', 'dimag overload ho gaya'],
-      NORMAL: ['normal', 'okay', 'fine', 'alright', 'calm', 'calm down', 'peaceful', 'relaxed', 'stable', 'neutral', "i'm okay", "i'm fine", 'doing okay', 'feeling okay', 'nothing much', 'just normal', "i'm alright", 'normal hoon', 'theek hoon', 'thik hoon', 'sab theek', 'theek hai', 'kuch nahi', 'bas normal', 'shaant hoon', 'shant hoon', 'relaxed hoon', 'chill hoon', 'sab normal hai', 'theek chal raha hai', 'koi problem nahi', 'main okay hoon']
-    };
-
-    const negationPhrases = ['not', "don't", 'dont', "doesn't", 'doesnt', 'never', 'no longer', 'not feeling', "don't feel", 'dont feel'];
-
-    const priorityLevels = {
-      VERY_SCARED: 5,
-      ANXIOUS: 4, SCARED: 4, SAD: 4, ANGRY: 4, LONELY: 4, CONFUSED: 4, // HIGH
-      TIRED: 3, // MEDIUM
-      OVERJOYED: 2, HAPPY: 2, // POSITIVE
-      NORMAL: 1 // DEFAULT
-    };
-
-    const isNegated = (text, matchIndex) => {
-      if (matchIndex === 0) return false;
-      const prefix = text.substring(Math.max(0, matchIndex - 20), matchIndex);
-      return negationPhrases.some(neg => prefix.endsWith(neg + " ") || prefix.endsWith(neg));
-    };
-
-    // Always prefer the newest message. Only fallback if the newest has absolutely NO detectable mood.
-    for (let i = recentUserMsgs.length - 1; i >= 0; i--) {
-      const text = recentUserMsgs[i].content.toLowerCase().replace(/[.,!?;:]/g, ' ').replace(/\s+/g, ' ').trim();
-      
-      let messageMood = 'NORMAL';
-      let messagePriority = 0;
-      let moodFoundInMessage = false;
-
-      for (const [mood, phrases] of Object.entries(dictionaries)) {
-        const priority = priorityLevels[mood] || 1;
-
-        for (const phrase of phrases) {
-          const idx = text.indexOf(phrase);
-          if (idx !== -1) {
-            if (!isNegated(text, idx)) {
-              moodFoundInMessage = true;
-              if (priority > messagePriority) {
-                messagePriority = priority;
-                messageMood = mood;
-              }
-            }
-          }
-        }
-      }
-
-      if (moodFoundInMessage) {
-        return messageMood;
-      }
-    }
-    
-    return 'NORMAL';
-  };
-  
-  const currentMood = detectMood(messages);
+  // Phase 3: Backend-driven mood state with emotion smoothing
+  const [currentMood, setCurrentMood] = useState("NORMAL");
 
     /* ===========================
       PHASE 6 HELPERS
@@ -152,12 +85,10 @@ export default function Chat({
   useEffect(() => {
     if (messages.length === 0) return;
 
-    const mood = detectMood(messages);
-
     setEmotionHistory(prev => [
       ...prev,
       {
-        mood,
+        mood: currentMood,
         time: new Date().toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit"
@@ -167,21 +98,17 @@ export default function Chat({
 
     setConversationInsights({
       totalMessages: messages.length,
-      dominantMood: mood,
+      dominantMood: currentMood,
       supportLevel:
-        mood === "VERY_SCARED"
+        currentMood === "VERY_SCARED" || currentMood === "ANXIOUS"
           ? "Critical"
-          : mood === "SAD" ||
-            mood === "ANXIOUS" ||
-            mood === "SCARED"
+          : currentMood === "SAD" || currentMood === "ANGRY"
           ? "High"
-          : mood === "CONFUSED" ||
-            mood === "TIRED"
+          : currentMood === "TIRED"
           ? "Medium"
           : "Low"
     });
-
-  }, [messages]);
+  }, [messages, currentMood]);
 
 
 
@@ -365,12 +292,25 @@ export default function Chat({
       const headers = getAuthHeaders();
       const res = await axios.get(`${API_BASE_URL}/chat/history/${sessionId}`, { headers, timeout: 4000 });
       if (Array.isArray(res.data) && res.data.length > 0) {
-        setMessages(res.data.map(m => ({ sender: m.sender, content: m.content })));
+        setMessages(res.data.map(m => ({
+          sender: m.sender,
+          content: m.content,
+          mood: m.mood,
+          mood_confidence: m.mood_confidence,
+        })));
+        const latestWithMood = [...res.data].reverse().find(m => m.mood);
+        if (latestWithMood?.mood) {
+          setCurrentMood(latestWithMood.mood.toUpperCase());
+        } else {
+          setCurrentMood("NORMAL");
+        }
       } else {
         setMessages([]);
+        setCurrentMood("NORMAL");
       }
     } catch (err) {
       setMessages([]);
+      setCurrentMood("NORMAL");
     } finally {
       setIsLoading(false);
     }
@@ -397,7 +337,9 @@ export default function Chat({
       const data = response.data;
       const assistantMessage = {
         sender: "assistant",
-        content: data.reply
+        content: data.reply,
+        mood: data.mood,
+        mood_confidence: data.mood_confidence,
       };
 
       const updatedMessages = [
@@ -408,9 +350,20 @@ export default function Chat({
 
       setMessages(updatedMessages);
 
-      const mood = detectMood(updatedMessages);
+      // Emotion engine: backend-driven mood with smoothing
+      const rawMood = (data.mood || 'normal').toUpperCase();
+      const conf = data.mood_confidence ?? 0.8;
+      let effectiveMood = rawMood;
+      setCurrentMood(prev => {
+        // Smoothing: ignore a single NORMAL following a strong mood unless confidence >= 0.7
+        if (rawMood === 'NORMAL' && prev !== 'NORMAL' && conf < 0.7) {
+          effectiveMood = prev;
+          return prev;
+        }
+        return rawMood;
+      });
 
-      setFollowUpQuestion(generateFollowUpQuestion(mood));
+      setFollowUpQuestion(generateFollowUpQuestion(effectiveMood));
 
       updateConversationSummary(updatedMessages);
 

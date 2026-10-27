@@ -275,6 +275,8 @@ def chat_history(
             sender=r["sender"],
             content=r["content"],
             risk_tier=r.get("risk_tier"),
+            mood=r.get("mood") or "normal",
+            mood_confidence=r.get("mood_confidence"),
             created_at=r["created_at"],
         )
         for r in rows

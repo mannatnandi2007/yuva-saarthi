@@ -404,10 +404,13 @@ def save_message(
     content: str,
     risk_tier: Optional[str] = None,
     risk_rationale: Optional[str] = None,
+    mood: Optional[str] = None,
+    mood_confidence: Optional[float] = None,
 ) -> dict:
     """
     Insert one message row into the messages table.
     sender must be one of: 'user', 'assistant', 'system' (matches DB CHECK constraint).
+    Persists mood and mood_confidence for Phase 3 emotion engine.
     Returns the full inserted row including the generated message id.
     """
     payload = {
@@ -419,6 +422,10 @@ def save_message(
         payload["risk_tier"] = risk_tier
     if risk_rationale:
         payload["risk_rationale"] = risk_rationale
+    if mood:
+        payload["mood"] = mood
+    if mood_confidence is not None:
+        payload["mood_confidence"] = mood_confidence
 
     try:
         result = supabase.table("messages").insert(payload).execute()
@@ -426,6 +433,16 @@ def save_message(
             raise Exception("No data returned from messages insert")
         return result.data[0]
     except Exception as e:
+        err_str = str(e).lower()
+        if ("mood" in payload or "mood_confidence" in payload) and "column" in err_str:
+            # Fallback if DB schema doesn't yet have mood columns
+            fallback_payload = {k: v for k, v in payload.items() if k not in ("mood", "mood_confidence")}
+            try:
+                res = supabase.table("messages").insert(fallback_payload).execute()
+                if res.data:
+                    return {**res.data[0], **{k: v for k, v in payload.items() if k in ("mood", "mood_confidence")}}
+            except Exception:
+                pass
         logger.warning("save_message error for session %s sender %s: %s (using local fallback)", session_id, sender, e)
         return {"id": str(uuid.uuid4()), **payload}
 
@@ -475,15 +492,27 @@ def get_message_history(session_id: str, user_id: str) -> List[dict]:
     try:
         result = (
             supabase.table("messages")
-            .select("id, sender, content, risk_tier, created_at")
+            .select("id, sender, content, risk_tier, mood, mood_confidence, created_at")
             .eq("session_id", session_id)
             .order("created_at", desc=False)
             .execute()
         )
         return result.data or []
     except Exception as e:
+        err_str = str(e).lower()
+        if "column" in err_str and "mood" in err_str:
+            try:
+                result = (
+                    supabase.table("messages")
+                    .select("id, sender, content, risk_tier, created_at")
+                    .eq("session_id", session_id)
+                    .order("created_at", desc=False)
+                    .execute()
+                )
+                return result.data or []
+            except Exception:
+                pass
         logger.error("get_message_history error for session %s: %s", session_id, e)
-        err_str = str(e)
         if "ConnectError" in type(e).__name__ or "getaddrinfo" in err_str:
             return []
         raise HTTPException(
@@ -506,6 +535,7 @@ async def send_chat_message(
 
     BUG-001 FIX: High-severity non-abuse messages now trigger Bland AI escalation.
     BUG-005 FIX: message_id is captured from save_message() and passed to risk event logging.
+    Phase 3: Mood and mood_confidence persisted with assistant response.
     """
     # Step 1: Ownership check — raises 403/404 if invalid
     session = validate_session_ownership(session_id, user_id)
@@ -551,13 +581,15 @@ async def send_chat_message(
     active_provider = get_last_request_provider()
     logger.info("[TELEMETRY] session=%s provider=%s", session_id, active_provider)
 
-    # Step 4: Persist the assistant's response with risk metadata
+    # Step 4: Persist the assistant's response with risk metadata and mood
     save_message(
         session_id=session_id,
         sender="assistant",
         content=ai_result.reply,
         risk_tier=ai_result.severity if ai_result.severity != "none" else None,
         risk_rationale=ai_result.rationale if ai_result.severity != "none" else None,
+        mood=ai_result.mood,
+        mood_confidence=ai_result.mood_confidence,
     )
 
     # Step 5: Determine action taken

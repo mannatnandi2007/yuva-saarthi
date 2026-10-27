@@ -5,9 +5,21 @@
 # thin and teammates (Mannat, Aklesh, Aakansha, Khushal) have one authoritative contract
 # to reference when integrating.
 
+from enum import Enum
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
+
+
+class MoodEnum(str, Enum):
+    """Supported mood values for Yuva Saarthi emotional tracking."""
+    NORMAL = "normal"
+    HAPPY = "happy"
+    OVERJOYED = "overjoyed"
+    SAD = "sad"
+    ANGRY = "angry"
+    ANXIOUS = "anxious"
+    TIRED = "tired"
 
 
 # ---------------------------------------------------------------------------
@@ -140,5 +152,7 @@ class MessageHistoryItem(BaseModel):
     sender: str        # user | assistant | system
     content: str
     risk_tier: Optional[str] = None
+    mood: Optional[str] = "normal"
+    mood_confidence: Optional[float] = None
     created_at: datetime
 

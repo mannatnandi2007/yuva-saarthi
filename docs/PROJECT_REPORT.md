@@ -268,6 +268,13 @@ ENABLE_DEMO_ROUTES=false
 
 ## 11. Changelog
 
+* **v2.2.0 (Phase 3 Backend Mood Engine & Persistence):**
+  * Added `mood` and `mood_confidence` columns to `messages` table via Supabase migration `20261027000000_add_mood_column.sql`.
+  * Added `MoodEnum` (`normal`, `happy`, `overjoyed`, `sad`, `angry`, `anxious`, `tired`) to backend schemas.
+  * Updated `MessageHistoryItem` and `ChatResponse` with mood and confidence fields.
+  * Updated `chat_service.py` (`save_message`, `get_message_history`, `send_chat_message`) to persist and retrieve mood with graceful schema fallback.
+  * Removed brittle client-side substring keyword mood matching (`detectMood`) in favor of backend-driven emotion detection with transition smoothing.
+  * Added dedicated Phase 3 mood unit test suite (`test_phase3_mood.py`).
 * **v2.1.0 (Phase 2 LLM & Chat Architecture Overhaul):**
   * Implemented resilient async HTTP client with connection pooling, 15s timeout, 3s connect timeout.
   * Multi-turn conversational memory: loads 12 recent turns with 10,000 character budget pruning.

@@ -175,8 +175,9 @@ class TestEndToEndEscalationPipeline:
         assert stage3["contacts_called"] is False
         assert stage3["helpline_routed"] is True
 
+    @patch("app.services.classifier._call_llm_classifier", return_value=None)
     @patch("app.services.folder_rag_service.search_folder_rag", return_value=[])
-    def test_demo_run_false_positive_guard(self, _mock_rag):
+    def test_demo_run_false_positive_guard(self, _mock_rag, _mock_llm):
         resp = client.post("/demo/run", json={"scenario": "false_positive_guard"})
         assert resp.status_code == 200
         data = resp.json()
