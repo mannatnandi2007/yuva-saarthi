@@ -201,7 +201,12 @@ Understand English, Hindi, and Hinglish. Do not answer questions or give advice;
 - [x] 150-word rolling context summarization
 - [x] Local document RAG retrieval with vector similarity
 - [x] Batch session deletion with foreign key cascading
-- [x] Provider health telemetry endpoint (`/health/llm`)
+- [x] Multi-turn context injection (12 turns, 10,000 char budget)
+- [x] Sane provider circuit breaker with half-open probe recovery
+- [x] Single-turn structured JSON output with mood and confidence
+- [x] Deterministic keyword pre-filter safety floor (can only elevate severity)
+- [x] Anti-cliché empathetic system prompt with 5 few-shot examples
+- [x] Honest degraded fallback with word-boundary regex checks and helplines
 - [ ] Backend-driven mood persistence on message records (Phase 3)
 - [ ] Multi-channel alert notifications: Fast2SMS, Telegram, Email (Phase 5)
 - [ ] Pure SVG 2D Yusa Mascot with 7 expressive moods (Phase 6)
@@ -212,14 +217,16 @@ Understand English, Hindi, and Hinglish. Do not answer questions or give advice;
 
 ## 8. Test Coverage & Quality Assurance
 
-The test suite in `backend/tests/` verifies end-to-end functionality across 98 automated unit and integration tests:
+The test suite in `backend/tests/` verifies end-to-end functionality across 115 automated unit and integration tests:
 
 | Test Module | Tests | Primary Validations |
 |---|:---:|---|
 | `test_api.py` | 90 | User registration, authentication, chat completion, session CRUD, batch deletion, RAG retrieval, LLM health checks, provider telemetry |
+| `test_phase2_llm.py` | 17 | Multi-turn context windowing, circuit breaker state transitions (closed/open/half-open), structured JSON output parsing, pre-filter safety floor enforcement, word-boundary fallback |
 | `test_escalation_loop.py` | 8 | Sequential voice call retry loop, alert attempt database logging, Rule §3.4a abuse bypass, false positive thresholds |
 
-All 98 tests pass cleanly with `pytest`.
+All 115 tests pass cleanly with `pytest`.
+
 
 ---
 
@@ -261,6 +268,15 @@ ENABLE_DEMO_ROUTES=false
 
 ## 11. Changelog
 
+* **v2.1.0 (Phase 2 LLM & Chat Architecture Overhaul):**
+  * Implemented resilient async HTTP client with connection pooling, 15s timeout, 3s connect timeout.
+  * Multi-turn conversational memory: loads 12 recent turns with 10,000 character budget pruning.
+  * Implemented `ProviderCircuitBreaker` handling HTTP 429 (`Retry-After`), consecutive 5xx error thresholds, and half-open probe recovery.
+  * Overhauled system prompt with culturally grounded Indian youth tone, anti-cliché directives, and 5 few-shot examples.
+  * Single-turn structured JSON output (`reply`, `mood`, `mood_confidence`, `severity`, `category`, `language`, `rationale`).
+  * Enforced deterministic pre-filter safety floor (tripwire can elevate severity, model cannot downgrade).
+  * Implemented honest degraded fallback with word-boundary regex checks and verified emergency helplines.
+  * Added RAG document chunk and embedding disk caching (`.rag_cache.pkl`).
 * **v2.0.0 (Phase 1 Overhaul):**
   * Consolidated documentation into `docs/PROJECT_REPORT.md` and `docs/DESIGN_SYSTEM.md`.
   * Removed deprecated chat stubs (`/chat/session/start`, `/chat/message/send`).
@@ -272,3 +288,4 @@ ENABLE_DEMO_ROUTES=false
 * **v1.2.0:** RAG local document retrieval and rolling conversation summaries.
 * **v1.1.0:** Bland AI voice telephony escalation loop and Rule §3.4a abuse safeguard.
 * **v1.0.0:** Initial MVP sprint with Supabase auth, chat interface, and risk classifier.
+

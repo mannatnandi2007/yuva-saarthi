@@ -37,7 +37,10 @@ class ChatServiceResult:
     rationale: str
     action_taken: str
     heading: Optional[str] = None
-    provider: str = "local_fallback"  # Phase 6 telemetry: 'gemini' | 'groq' | 'local_fallback'
+    provider: str = "local_fallback"  # 'gemini' | 'groq' | 'third_party' | 'local_fallback'
+    mood: str = "normal"
+    mood_confidence: float = 0.8
+    degraded: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -517,12 +520,31 @@ async def send_chat_message(
     )
     message_id = user_msg_row.get("id")
 
-    # Step 3: Get AI response via the abstraction layer
+    # Step 3: Fetch prior message turns for multi-turn context (Phase 2)
+    turns = []
+    try:
+        hist_res = (
+            supabase.table("messages")
+            .select("sender, content")
+            .eq("session_id", session_id)
+            .order("created_at", desc=True)
+            .limit(12)
+            .execute()
+        )
+        raw_rows = hist_res.data or []
+        for r in reversed(raw_rows):
+            sender = r.get("sender")
+            role = "assistant" if sender == "assistant" else "user"
+            turns.append({"role": role, "content": r.get("content", "")})
+    except Exception as hist_err:
+        logger.debug("Could not fetch turns for session %s: %s", session_id, hist_err)
+
     ai_result: AIResponse = await get_ai_response(
         user_message=message,
         session_id=session_id,
         user_id=user_id,
         rolling_summary=rolling_summary,
+        turns=turns,
     )
 
     # Phase 6 Telemetry: read which provider actually served this request
@@ -613,6 +635,10 @@ async def send_chat_message(
             derived_heading = generate_chat_heading(summary=new_summary, first_message=message)
             full_snapshot = f"Heading: {derived_heading}\n\n{new_summary}"
             save_session_summary(session_id, full_snapshot)
+            try:
+                supabase.table("sessions").update({"heading": derived_heading}).eq("id", session_id).execute()
+            except Exception:
+                pass
         except Exception as sum_err:
             logger.debug("Background summary update error: %s", sum_err)
 
@@ -630,7 +656,11 @@ async def send_chat_message(
         action_taken=action_taken,
         heading=heading,
         provider=active_provider,
+        mood=getattr(ai_result, "mood", "normal"),
+        mood_confidence=getattr(ai_result, "mood_confidence", 0.8),
+        degraded=getattr(ai_result, "degraded", False),
     )
+
 
 
 def _trigger_escalation_background(

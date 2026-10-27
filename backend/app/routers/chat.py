@@ -237,7 +237,11 @@ async def chat(
         heading=result.heading,
         session_id=payload.session_id,
         llm_provider=result.provider,
+        mood=result.mood,
+        mood_confidence=result.mood_confidence,
+        degraded=result.degraded,
     )
+
 
 
 # ===========================================================================

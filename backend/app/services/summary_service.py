@@ -55,8 +55,8 @@ def generate_rolling_summary(
         try:
             import httpx
             ACTIVE_MODELS = [
-                "gemini-2.5-flash",
-                "gemini-flash-latest",
+                settings.gemini_model,
+                settings.gemini_fallback_model,
             ]
             for model_name in ACTIVE_MODELS:
                 endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
@@ -76,18 +76,15 @@ def generate_rolling_summary(
                         summary = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                         return _truncate_to_word_cap(summary)
                     elif resp.status_code == 429:
-                        logger.warning("Summary Gemini model %s quota reached (HTTP 429). Tripping cooldown and switching directly to Groq Cloud...", model_name)
-                        trip_gemini_cooldown(180.0)
+                        logger.warning("Summary Gemini model %s quota reached (HTTP 429). Tripping cooldown...", model_name)
+                        trip_gemini_cooldown(45.0)
                         break
                 except Exception as sum_model_err:
                     logger.warning("Summary Gemini model %s failed: %s", model_name, sum_model_err)
                     continue
 
-            logger.warning("[FAILOVER] Gemini pool exhausted for summary. Tripping 180s cooldown and redirecting to Groq Cloud...")
-            trip_gemini_cooldown(180.0)
         except Exception as e:
-            logger.warning("Gemini summary generation failed: %s. Tripping cooldown and switching to Groq Cloud...", e)
-            trip_gemini_cooldown(180.0)
+            logger.warning("Gemini summary generation failed: %s.", e)
 
     # 2. Attempt Groq Cloud
     groq_key = settings.groq_api_key or os.environ.get("GROQ_API_KEY")
@@ -97,7 +94,7 @@ def generate_rolling_summary(
             endpoint = "https://api.groq.com/openai/v1/chat/completions"
             headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
             payload = {
-                "model": "qwen/qwen3.8-27b",
+                "model": settings.groq_model,
                 "messages": [
                     {"role": "system", "content": SUMMARY_SYSTEM_PROMPT},
                     {"role": "user", "content": turn_context}
@@ -111,6 +108,7 @@ def generate_rolling_summary(
                 return _truncate_to_word_cap(summary)
         except Exception as e:
             logger.warning("Groq summary generation failed: %s", e)
+
 
     # 3. Local Deterministic Fallback Summarizer
     clean_user = user_message.strip().replace("\n", " ")

@@ -235,8 +235,8 @@ def _call_llm_classifier(message: str, rolling_summary: Optional[str] = None) ->
         try:
             full_prompt = f"{CRISIS_DETECTION_SYSTEM_PROMPT}\n\n{user_prompt}"
             ACTIVE_MODELS = [
-                "gemini-2.5-flash",
-                "gemini-flash-latest",
+                settings.gemini_model,
+                settings.gemini_fallback_model,
             ]
             for model in ACTIVE_MODELS:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={gemini_key}"
@@ -267,18 +267,15 @@ def _call_llm_classifier(message: str, rolling_summary: Optional[str] = None) ->
                                     rationale=parsed.get("rationale", "Classified by safety model.")
                                 )
                     elif resp.status_code == 429:
-                        logger.warning("Classifier Gemini model %s quota reached (HTTP 429). Tripping cooldown and switching directly to Groq Cloud...", model)
-                        trip_gemini_cooldown(180.0)
+                        logger.warning("Classifier Gemini model %s quota reached (HTTP 429). Tripping cooldown...", model)
+                        trip_gemini_cooldown(45.0)
                         break
                 except Exception as model_err:
                     logger.warning("Classifier Gemini model %s failed: %s", model, model_err)
                     continue
 
-            logger.warning("[FAILOVER] Gemini pool exhausted for classifier. Tripping 180s cooldown and redirecting to Groq Cloud...")
-            trip_gemini_cooldown(180.0)
         except Exception as ex:
-            logger.warning("Primary LLM (Gemini) failed (%s). Tripping cooldown and switching to Groq Cloud...", ex)
-            trip_gemini_cooldown(180.0)
+            logger.warning("Primary LLM (Gemini) failed (%s).", ex)
 
     # --- 2. Attempt Fallback: Groq Cloud ---
     groq_key = settings.groq_api_key or os.environ.get("GROQ_API_KEY")
@@ -287,7 +284,7 @@ def _call_llm_classifier(message: str, rolling_summary: Optional[str] = None) ->
             endpoint = "https://api.groq.com/openai/v1/chat/completions"
             headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
             payload = {
-                "model": "qwen/qwen3.8-27b",
+                "model": settings.groq_model,
                 "messages": [
                     {"role": "system", "content": CRISIS_DETECTION_SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt}
@@ -310,6 +307,7 @@ def _call_llm_classifier(message: str, rolling_summary: Optional[str] = None) ->
             logger.warning("Groq Cloud fallback failed: %s", ex)
 
     return None
+
 
 
 def route_safety_escalation(

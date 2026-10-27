@@ -151,7 +151,10 @@ class TestAbuseSafeguardRule34a:
 class TestEndToEndEscalationPipeline:
     """Test full pipeline execution via /demo/run and /chat endpoints."""
 
-    def test_demo_run_self_harm_scenario(self):
+    @patch("app.services.folder_rag_service.search_folder_rag", return_value=[
+        {"source": "WHO Guidelines", "title": "Crisis De-escalation", "chunk_text": "De-escalate gently"}
+    ])
+    def test_demo_run_self_harm_scenario(self, _mock_rag):
         resp = client.post("/demo/run", json={"scenario": "self_harm"})
         assert resp.status_code == 200
         data = resp.json()
@@ -160,7 +163,10 @@ class TestEndToEndEscalationPipeline:
         assert "stage_3_escalation" in data["pipeline_results"]
         assert "stage_4_rag" in data["pipeline_results"]
 
-    def test_demo_run_abuse_bypass_scenario(self):
+    @patch("app.services.folder_rag_service.search_folder_rag", return_value=[
+        {"source": "WHO Guidelines", "title": "Abuse Protocol", "chunk_text": "Safe haven"}
+    ])
+    def test_demo_run_abuse_bypass_scenario(self, _mock_rag):
         resp = client.post("/demo/run", json={"scenario": "abuse_bypass"})
         assert resp.status_code == 200
         data = resp.json()
@@ -169,9 +175,11 @@ class TestEndToEndEscalationPipeline:
         assert stage3["contacts_called"] is False
         assert stage3["helpline_routed"] is True
 
-    def test_demo_run_false_positive_guard(self):
+    @patch("app.services.folder_rag_service.search_folder_rag", return_value=[])
+    def test_demo_run_false_positive_guard(self, _mock_rag):
         resp = client.post("/demo/run", json={"scenario": "false_positive_guard"})
         assert resp.status_code == 200
         data = resp.json()
         assert data["summary"]["risk_level"] in ("NONE", "LOW")
         assert data["summary"]["safe_to_proceed"] is True
+

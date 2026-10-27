@@ -684,9 +684,22 @@ def search_folder_rag(
     global _CHUNK_CACHE
     global _EMBEDDINGS_CACHE
 
-    # Load chunks
-    if not _CHUNK_CACHE:
+    disk_cache = os.path.join(RAG_DOCS_DIR, ".rag_cache.pkl")
 
+    # Fast load from disk cache if memory cache is empty
+    if not _CHUNK_CACHE or _EMBEDDINGS_CACHE is None:
+        if os.path.exists(disk_cache):
+            try:
+                import pickle
+                with open(disk_cache, "rb") as f:
+                    _CHUNK_CACHE, _EMBEDDINGS_CACHE = pickle.load(f)
+            except Exception as ce:
+                logger.debug("Could not load RAG disk cache: %s", ce)
+                _CHUNK_CACHE = []
+                _EMBEDDINGS_CACHE = None
+
+    # Load chunks if still empty
+    if not _CHUNK_CACHE:
         _CHUNK_CACHE = scan_and_chunk_folder()
 
     if not _CHUNK_CACHE:
@@ -715,6 +728,14 @@ def search_folder_rag(
                     convert_to_numpy=True,
                     normalize_embeddings=True
                 )
+
+                try:
+                    import pickle
+                    with open(disk_cache, "wb") as f:
+                        pickle.dump((_CHUNK_CACHE, _EMBEDDINGS_CACHE), f)
+                except Exception as save_err:
+                    logger.debug("Could not save RAG disk cache: %s", save_err)
+
 
             # Generate query embedding
             query_embedding = model.encode(
@@ -877,9 +898,17 @@ def refresh_folder_rag():
     _CHUNK_CACHE = []
     _EMBEDDINGS_CACHE = None
 
+    disk_cache = os.path.join(RAG_DOCS_DIR, ".rag_cache.pkl")
+    if os.path.exists(disk_cache):
+        try:
+            os.remove(disk_cache)
+        except Exception:
+            pass
+
     logger.info(
         "[FOLDER RAG] Cache invalidated."
     )
+
 
 
 # ---------------------------------------------------------------------------

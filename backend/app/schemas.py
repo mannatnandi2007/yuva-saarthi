@@ -97,6 +97,17 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=4000, description="The user's message text")
 
 
+class StructuredTurnOutput(BaseModel):
+    """Single structured turn output produced by the LLM (Phase 2)."""
+    reply: str = Field(..., description="The conversational response to the user.")
+    mood: str = Field("normal", description="Detected user mood (e.g., anxious, distressed, lonely, normal, hopeful).")
+    mood_confidence: float = Field(0.8, ge=0.0, le=1.0, description="Confidence in mood detection.")
+    severity: str = Field("none", description="Safety severity: none, low, medium, high.")
+    category: str = Field("none", description="Safety category: none, self_harm, abuse, distress.")
+    language: str = Field("hinglish", description="Detected language/register: english, hindi, hinglish.")
+    rationale: str = Field("", description="Clinical rationale for the safety classification.")
+
+
 class RiskClassificationResponse(BaseModel):
     """Embedded risk result in the chat response"""
     severity: str  # none | low | medium | high
@@ -111,7 +122,10 @@ class ChatResponse(BaseModel):
     action_taken: str  # matches action_taken_type DB enum
     heading: Optional[str] = None
     session_id: Optional[str] = None
-    llm_provider: Optional[str] = None  # Phase 6 telemetry: 'gemini' | 'groq' | 'local_fallback'
+    llm_provider: Optional[str] = None  # 'gemini' | 'groq' | 'third_party' | 'local_fallback'
+    mood: Optional[str] = "normal"
+    mood_confidence: Optional[float] = 0.8
+    degraded: Optional[bool] = False
 
 
 # ---------------------------------------------------------------------------
