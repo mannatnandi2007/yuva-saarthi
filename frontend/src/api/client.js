@@ -32,6 +32,13 @@ apiClient.interceptors.request.use((config) => {
         config.headers['X-Dev-User-Id'] = parsed.user_id;
       }
     }
+    // Dev fallback: if no token present in local dev, provide dev token to prevent 401 unauthenticated drops
+    if (!config.headers.Authorization && import.meta.env.DEV) {
+      config.headers.Authorization = 'Bearer dev-test-token-12345';
+      if (!config.headers['X-Dev-User-Id']) {
+        config.headers['X-Dev-User-Id'] = '00000000-0000-0000-0000-000000000001';
+      }
+    }
   } catch (err) {
     // Non-fatal if parsing session fails
   }
