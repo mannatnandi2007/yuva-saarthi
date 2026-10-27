@@ -47,6 +47,14 @@ class Settings(BaseSettings):
     # Demo Routes Gating (Phase 1)
     enable_demo_routes: bool = False
 
+    # Phase 5: Multi-Channel Notification Settings
+    notify_channels: str = ""  # Comma-separated: sms_fast2sms,telegram,email
+    notify_dry_run: bool = True  # Default true in dev — logs instead of sending
+    fast2sms_api_key: Optional[str] = None
+    telegram_bot_token: Optional[str] = None
+    email_api_key: Optional[str] = None
+    email_from: str = "alerts@yuvasaarthi.in"
+
     # Settings configurations to read from .env if present
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -615,28 +615,21 @@ async def send_chat_message(
             action_taken=action_taken,
         )
 
-    # Step 7: Trigger Bland AI sequential escalation loop (Task 7)
-    # The call should be made on escalation: self-harm OR high anxiety detected (non-abuse)
-    msg_lower = message.lower()
-    is_self_harm_escalation = (ai_result.category in ("self_harm", "suicide"))
-    is_high_anxiety_escalation = (
-        (ai_result.category in ("anxiety", "panic", "distress") or ai_result.severity in ("high", "medium"))
-        and any(k in msg_lower for k in [
-            "anxiety", "panic attack", "panic", "can't breathe", "cant breathe", "breathless", 
-            "hyperventilat", "chest tight", "shivering", "trembling", "terrified", "so scared", 
-            "ghabrahat", "saans nahi", "dil ghabra", "bohot anxiety", "severe panic", "heart racing"
-        ])
-    )
-    is_general_high_escalation = (ai_result.severity == "high")
+    # Step 7: Trigger escalation for HIGH self-harm ONLY (DECISION 2 — tightened)
+    # Voice calls + notifications: severity == high AND category == self_harm
+    # Medium severity / anxiety keywords: in-app grounding only (no external notification)
+    # Abuse bypass: category == abuse — NO personal contacts contacted (§3.4a)
 
-    should_escalate = (is_self_harm_escalation or is_high_anxiety_escalation or is_general_high_escalation) and ai_result.category != "abuse"
+    should_escalate = (
+        ai_result.severity == "high"
+        and ai_result.category in ("self_harm", "suicide")
+        and ai_result.category != "abuse"
+    )
 
     if should_escalate:
-        escalation_reason = (
-            "acute self-harm danger" if is_self_harm_escalation 
-            else ("severe panic attack and high anxiety" if is_high_anxiety_escalation 
-            else "acute emotional crisis")
-        )
+        escalation_reason = "acute self-harm danger"
+
+        # 7a: Bland AI voice calls (existing)
         try:
             import asyncio
             asyncio.create_task(
@@ -654,6 +647,26 @@ async def send_chat_message(
                 category=ai_result.category,
                 risk_event_id=risk_event_id,
                 escalation_reason=escalation_reason,
+            )
+
+        # 7b: Multi-channel notifications (Phase 5 — SMS, Telegram, Email)
+        try:
+            import asyncio
+            asyncio.create_task(
+                asyncio.to_thread(
+                    _trigger_notifications_background,
+                    user_id=user_id,
+                    risk_event_id=risk_event_id,
+                    severity=ai_result.severity,
+                    category=ai_result.category,
+                )
+            )
+        except Exception:
+            _trigger_notifications_background(
+                user_id=user_id,
+                risk_event_id=risk_event_id,
+                severity=ai_result.severity,
+                category=ai_result.category,
             )
 
     # Step 8: Derive conversation heading immediately & update rolling summary asynchronously
@@ -723,3 +736,81 @@ def _trigger_escalation_background(
         )
     except Exception as e:
         logger.error("[ESCALATION] Bland AI sequential escalation failed for user %s: %s", user_id, e)
+
+
+def _trigger_notifications_background(
+    user_id: str,
+    risk_event_id: Optional[str] = None,
+    severity: str = "high",
+    category: str = "self_harm",
+) -> None:
+    """
+    Phase 5: Multi-channel notification dispatch (SMS, Telegram, Email).
+    Fetches emergency contacts from DB and dispatches through all configured channels.
+    Respects abuse bypass, rate limiting, and deduplication.
+    """
+    try:
+        from app.services.notifier import dispatch_notifications
+
+        # Fetch emergency contacts for this user
+        contacts = []
+        try:
+            result = (
+                supabase.table("emergency_contacts")
+                .select("id, phone, relationship, priority_order, telegram_chat_id, email")
+                .eq("user_id", user_id)
+                .order("priority_order", desc=False)
+                .execute()
+            )
+            contacts = result.data or []
+        except Exception as ce:
+            logger.warning("[NOTIFY] Could not fetch contacts for user %s: %s", user_id, ce)
+            # Try without the new columns in case migration hasn't been applied
+            try:
+                result = (
+                    supabase.table("emergency_contacts")
+                    .select("id, phone, relationship, priority_order")
+                    .eq("user_id", user_id)
+                    .order("priority_order", desc=False)
+                    .execute()
+                )
+                contacts = result.data or []
+            except Exception:
+                pass
+
+        if not contacts:
+            logger.info("[NOTIFY] No emergency contacts found for user %s", user_id)
+            return
+
+        # Fetch user's name for message personalization
+        user_name = "Your child"
+        try:
+            user_result = (
+                supabase.table("users")
+                .select("phone")
+                .eq("id", user_id)
+                .limit(1)
+                .execute()
+            )
+            if user_result.data:
+                user_name = f"the young person (phone: {user_result.data[0].get('phone', 'N/A')})"
+        except Exception:
+            pass
+
+        round_result = dispatch_notifications(
+            user_id=user_id,
+            contacts=contacts,
+            risk_event_id=risk_event_id,
+            severity=severity,
+            category=category,
+            user_first_name=user_name,
+        )
+
+        sent_count = sum(1 for r in round_result.results if r.success)
+        logger.info(
+            "[NOTIFY] Dispatch complete for user=%s: %d/%d successful, skipped=%s",
+            user_id, sent_count, round_result.channels_attempted,
+            round_result.skipped_reason or "none",
+        )
+    except Exception as e:
+        logger.error("[NOTIFY] Notification dispatch failed for user %s: %s", user_id, e)
