@@ -2,37 +2,12 @@
  * Yuva Saarthi — Yusa Companion Mascot
  * Powered by interactive 3D WebGL (Three.js / React Three Fiber).
  * Features real-time mood reactivity, cursor eye-tracking, breathing animations,
- * dynamic eyelids, brows, blush, and custom expressions for all mood states.
+ * dynamic eyelids, brows, blush, and custom expressions for all emotional states.
  */
 
 import React, { useState } from 'react';
 import Yusa3D from './Yusa3D.jsx';
-
-const MOOD_COLORS = {
-  normal: 'var(--lilac)',
-  happy: 'var(--yellow)',
-  overjoyed: 'var(--pink)',
-  sad: 'var(--sky)',
-  angry: 'var(--coral)',
-  anxious: 'var(--mint)',
-  tired: 'var(--surface-2)',
-  lonely: 'var(--lilac)',
-  scared: 'var(--sky)',
-  confused: 'var(--yellow)',
-};
-
-const MOOD_MESSAGES = {
-  normal: "I'm here with you 🌸",
-  happy: "Love seeing you smile! ✨",
-  overjoyed: "You're doing amazing! 🎉",
-  sad: "I'm right here beside you 💗",
-  angry: "Take a slow, deep breath 🌿",
-  anxious: "One step at a time, you are safe 🛡️",
-  tired: "Rest is important, take it easy 🌙",
-  lonely: "You are never alone, I am with you 🫂",
-  scared: "You are in a safe place here 🛡️",
-  confused: "We can figure this out together 💡",
-};
+import { MOOD_META, normalizeMood } from '../utils/emotionEngine.js';
 
 export function YusaCompanion({
   mood = 'normal',
@@ -43,12 +18,11 @@ export function YusaCompanion({
   onClick = null,
 }) {
   const [bounced, setBounced] = useState(false);
-  const normalizedMood = (mood || 'normal').toLowerCase();
-  const validMoods = ['normal', 'happy', 'overjoyed', 'sad', 'angry', 'anxious', 'tired', 'lonely', 'scared', 'confused'];
-  const currentMood = validMoods.includes(normalizedMood) ? normalizedMood : 'normal';
+  const canonicalMood = normalizeMood(mood);
+  const meta = MOOD_META[canonicalMood] || MOOD_META.normal;
 
-  const bubbleColor = MOOD_COLORS[currentMood] || 'var(--lilac)';
-  const bubbleText = customMessage || MOOD_MESSAGES[currentMood] || MOOD_MESSAGES.normal;
+  const bubbleColor = meta.color;
+  const bubbleText = customMessage || meta.message;
 
   const handleMascotClick = (e) => {
     setBounced(true);
@@ -131,7 +105,7 @@ export function YusaCompanion({
           cursor: 'pointer',
         }}
       >
-        <Yusa3D mood={currentMood.toUpperCase()} />
+        <Yusa3D mood={meta.yusa3d} />
       </div>
     </div>
   );

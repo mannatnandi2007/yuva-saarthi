@@ -1,11 +1,12 @@
 /**
  * Yuva Saarthi — useChat Hook
- * Phase 3, Phase 4 & Phase 6: Manages messages, backend-driven mood,
- * optimistic updates, lazy session attachment, degraded-mode detection, and helplines.
+ * Real-time emotional resonance, optimistic updates, session management,
+ * degraded-mode handling, and automatic helpline triggers.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import apiClient from '../api/client';
+import { normalizeMood, detectEmotionFromText } from '../utils/emotionEngine';
 
 export function useChat({ currentSessionId, onSessionCreated, onSessionsRefresh }) {
   const [messages, setMessages] = useState([]);
@@ -20,22 +21,22 @@ export function useChat({ currentSessionId, onSessionCreated, onSessionsRefresh 
   const abortControllerRef = useRef(null);
   const lastStrongMoodRef = useRef('normal');
 
-  // Smooth mood transitions: ignore single 'normal' after a strong mood unless confidence >= 0.7
+  // Smooth mood transitions & enforce canonical emotion states
   const updateSmoothedMood = useCallback((newMood, confidence = 1.0) => {
     if (!newMood) return;
-    const moodLower = newMood.toLowerCase();
+    const resolved = normalizeMood(newMood);
 
-    if (moodLower === 'normal') {
-      if (lastStrongMoodRef.current !== 'normal' && confidence < 0.7) {
-        // Keep previous strong mood for stability
+    if (resolved === 'normal') {
+      if (lastStrongMoodRef.current !== 'normal' && confidence < 0.6) {
+        // Keep previous strong mood briefly for stability
         return;
       }
       lastStrongMoodRef.current = 'normal';
     } else {
-      lastStrongMoodRef.current = moodLower;
+      lastStrongMoodRef.current = resolved;
     }
 
-    setCurrentMood(moodLower);
+    setCurrentMood(resolved);
     setMoodConfidence(confidence);
   }, []);
 
@@ -73,12 +74,21 @@ export function useChat({ currentSessionId, onSessionCreated, onSessionsRefresh 
         }));
         setMessages(normalized);
 
-        // Restore latest assistant mood from history
-        const lastWithMood = [...normalized].reverse().find((m) => m.role === 'assistant' && m.mood);
-        if (lastWithMood && lastWithMood.mood) {
-          updateSmoothedMood(lastWithMood.mood, lastWithMood.mood_confidence);
+        // Restore latest emotional state from history
+        const lastAssistant = [...normalized].reverse().find((m) => m.role === 'assistant' && m.mood);
+        if (lastAssistant && lastAssistant.mood) {
+          const canonical = normalizeMood(lastAssistant.mood, lastAssistant.content);
+          updateSmoothedMood(canonical, lastAssistant.mood_confidence);
         } else {
-          setCurrentMood('normal');
+          // Check last user message for emotion keywords if assistant mood not set
+          const lastUser = [...normalized].reverse().find((m) => m.role === 'user');
+          if (lastUser) {
+            const userDetected = detectEmotionFromText(lastUser.content);
+            if (userDetected) updateSmoothedMood(userDetected, 0.85);
+            else setCurrentMood('normal');
+          } else {
+            setCurrentMood('normal');
+          }
         }
       })
       .catch((err) => {
@@ -104,6 +114,12 @@ export function useChat({ currentSessionId, onSessionCreated, onSessionsRefresh 
 
       setIsSending(true);
       setError(null);
+
+      // Real-time emotional resonance: immediately detect user's emotion and update Yusa
+      const immediateUserMood = detectEmotionFromText(trimmed);
+      if (immediateUserMood) {
+        updateSmoothedMood(immediateUserMood, 0.9);
+      }
 
       let targetSessionId = currentSessionId;
 
@@ -142,7 +158,8 @@ export function useChat({ currentSessionId, onSessionCreated, onSessionsRefresh 
 
         const data = res.data;
         const replyText = data.reply || data.response || "I'm right here with you.";
-        const detectedMood = data.mood || 'normal';
+        const rawMood = data.mood || data.risk_classification?.category || (data.severity === 'high' ? 'distressed' : null);
+        const resolvedMood = normalizeMood(rawMood, trimmed);
         const confidence = data.mood_confidence ?? 1.0;
 
         // Check degraded flag
@@ -168,13 +185,13 @@ export function useChat({ currentSessionId, onSessionCreated, onSessionsRefresh 
           id: data.message_id || `asst-${Date.now()}`,
           role: 'assistant',
           content: replyText,
-          mood: detectedMood,
+          mood: resolvedMood,
           mood_confidence: confidence,
           created_at: new Date().toISOString(),
         };
 
         setMessages((prev) => [...prev, assistantMsg]);
-        updateSmoothedMood(detectedMood, confidence);
+        updateSmoothedMood(resolvedMood, confidence);
 
         if (onSessionsRefresh) {
           onSessionsRefresh();
@@ -187,10 +204,11 @@ export function useChat({ currentSessionId, onSessionCreated, onSessionsRefresh 
           id: `err-${Date.now()}`,
           role: 'assistant',
           content: "I'm having a little trouble connecting right now, but please know you're not alone. If you need urgent support, call Tele-MANAS at 14416 (toll-free).",
-          mood: 'normal',
+          mood: 'distressed',
           created_at: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, fallbackMsg]);
+        updateSmoothedMood('distressed', 0.9);
         setDegraded(true);
       } finally {
         setIsSending(false);
@@ -201,15 +219,14 @@ export function useChat({ currentSessionId, onSessionCreated, onSessionsRefresh 
 
   return {
     messages,
+    sendMessage,
+    isSending,
     currentMood,
     moodConfidence,
     isLoadingMessages,
-    isSending,
     error,
     degraded,
     activeHelplines,
-    sendMessage,
-    setMessages,
   };
 }
 

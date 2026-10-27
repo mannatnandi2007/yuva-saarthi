@@ -1,25 +1,16 @@
 /**
  * Yuva Saarthi — Message Bubble Component
- * Phase 6: User message (--lilac) and Assistant message (--surface)
+ * User message (--lilac) and Assistant message (--surface)
  * 2px stroke, 20px radius, hard offset shadow, zero gradients.
  */
 
 import React from 'react';
-
-const MOOD_EMOJIS = {
-  normal: '🌸',
-  happy: '✨',
-  overjoyed: '🎉',
-  sad: '💗',
-  angry: '🌿',
-  anxious: '🛡️',
-  tired: '🌙',
-};
+import { MOOD_META, normalizeMood } from '../../utils/emotionEngine.js';
 
 export function MessageBubble({ message, isLatest = false }) {
   const isUser = message.role === 'user';
-  const mood = message.mood ? message.mood.toLowerCase() : null;
-  const moodEmoji = mood ? (MOOD_EMOJIS[mood] || '🌸') : null;
+  const moodKey = message.mood ? normalizeMood(message.mood) : null;
+  const moodMeta = moodKey ? MOOD_META[moodKey] : null;
 
   const timeString = message.created_at
     ? new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -58,7 +49,7 @@ export function MessageBubble({ message, isLatest = false }) {
         {message.content}
 
         {/* Assistant Mood Badge if present */}
-        {!isUser && mood && (
+        {!isUser && moodMeta && moodKey !== 'normal' && (
           <div
             style={{
               display: 'inline-flex',
@@ -67,16 +58,16 @@ export function MessageBubble({ message, isLatest = false }) {
               marginTop: '6px',
               padding: '2px 8px',
               borderRadius: 'var(--radius-pill)',
-              backgroundColor: 'var(--surface-2)',
+              backgroundColor: moodMeta.color,
               border: '1px solid var(--stroke)',
               fontSize: '11px',
-              fontWeight: 600,
-              color: 'var(--text-muted)',
+              fontWeight: 700,
+              color: '#16131F',
               fontFamily: 'var(--font-body)',
             }}
           >
-            <span>{moodEmoji}</span>
-            <span>{mood.charAt(0).toUpperCase() + mood.slice(1)}</span>
+            <span>{moodMeta.emoji}</span>
+            <span>{moodMeta.label}</span>
           </div>
         )}
       </div>
@@ -88,8 +79,7 @@ export function MessageBubble({ message, isLatest = false }) {
             fontSize: '11px',
             color: 'var(--text-muted)',
             marginTop: '4px',
-            paddingLeft: isUser ? '0' : '6px',
-            paddingRight: isUser ? '6px' : '0',
+            padding: '0 4px',
             fontFamily: 'var(--font-body)',
           }}
         >

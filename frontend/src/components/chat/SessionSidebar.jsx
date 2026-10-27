@@ -7,7 +7,6 @@
 
 import React, { useState } from 'react';
 import { Plus, Trash2, CheckSquare, Square, X, MessageSquare, Shield, Users } from 'lucide-react';
-import ThemeToggle from '../ThemeToggle';
 
 export function SessionSidebar({
   sessions = [],
@@ -403,10 +402,6 @@ export function SessionSidebar({
               <span>Emergency Contacts</span>
             </button>
           )}
-
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <ThemeToggle />
-          </div>
         </div>
       </aside>
     </>

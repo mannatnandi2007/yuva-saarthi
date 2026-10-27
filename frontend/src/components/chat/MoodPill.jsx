@@ -1,36 +1,27 @@
 /**
  * Yuva Saarthi — Mood Pill Component
- * Phase 6: Real-text mood pill displayed below Yusa mascot.
- * Solid pastel fill, solid #16131F text for WCAG AA compliance, solid stroke.
+ * Displays empathetic real-time emotional resonance badge below 3D mascot.
+ * Fully wired to Emotion Engine with support for distressed, stressed, anxious, sad, angry, etc.
  */
 
 import React from 'react';
-
-const MOOD_META = {
-  normal: { label: 'Peaceful', color: 'var(--lilac)', emoji: '🌸' },
-  happy: { label: 'Happy', color: 'var(--yellow)', emoji: '✨' },
-  overjoyed: { label: 'Overjoyed', color: 'var(--pink)', emoji: '🎉' },
-  sad: { label: 'Gentle Care', color: 'var(--sky)', emoji: '💗' },
-  angry: { label: 'Deep Breaths', color: 'var(--coral)', emoji: '🌿' },
-  anxious: { label: 'Grounded', color: 'var(--mint)', emoji: '🛡️' },
-  tired: { label: 'Resting', color: 'var(--surface-2)', emoji: '🌙' },
-};
+import { MOOD_META, normalizeMood } from '../../utils/emotionEngine.js';
 
 export function MoodPill({ mood = 'normal', className = '' }) {
-  const norm = (mood || 'normal').toLowerCase();
+  const norm = normalizeMood(mood);
   const meta = MOOD_META[norm] || MOOD_META.normal;
 
   return (
     <div
       className={`yusa-mood-pill ${className}`}
       role="status"
-      aria-label={`Current emotional companion mood is ${meta.label}`}
+      aria-label={`Current emotional companion resonance is ${meta.label}`}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
         gap: '6px',
         backgroundColor: meta.color,
-        color: '#16131F', // Strict rule: Pastel-filled elements always use #16131F text in both themes
+        color: '#16131F', // Pastel-filled elements always use #16131F text in both themes
         border: 'var(--border-width) solid var(--stroke)',
         borderRadius: 'var(--radius-pill)',
         padding: '4px 12px',

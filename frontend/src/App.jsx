@@ -11,11 +11,14 @@ import Consent from './pages/Consent.jsx';
 import OtpVerification from './pages/OtpVerification.jsx';
 import Chat from './pages/Chat.jsx';
 import PoliciesPage from './pages/PoliciesPage.jsx';
-import ThemeToggle from './components/ThemeToggle.jsx';
+import useTheme from './hooks/useTheme.js';
 import { Shield, Users, LogOut, MessageCircle, Home } from 'lucide-react';
 import apiClient, { pingBackendWarmup } from './api/client.js';
 
 export default function App() {
+  // Enforce system default theme (dark if system/browser is dark, light if light)
+  useTheme();
+
   const [userSession, setUserSession] = useState(() => {
     try {
       const saved = localStorage.getItem('user_session') || localStorage.getItem('yuvaa_user_session');
@@ -280,8 +283,6 @@ export default function App() {
               </button>
             </>
           )}
-
-          <ThemeToggle compact />
         </div>
       </nav>
 

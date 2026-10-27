@@ -19,7 +19,6 @@ import Composer from '../components/chat/Composer';
 import SessionSidebar from '../components/chat/SessionSidebar';
 import ContactsDrawer from '../components/ContactsDrawer';
 import PolicyModal from '../components/PolicyModal';
-import ThemeToggle from '../components/ThemeToggle';
 import apiClient from '../api/client';
 
 export default function Chat() {
@@ -219,8 +218,6 @@ export default function Chat() {
               <Shield size={14} strokeWidth={2.5} />
               <span className="hide-on-mobile">Safety Charter</span>
             </button>
-
-            <ThemeToggle compact />
           </div>
         </header>
 

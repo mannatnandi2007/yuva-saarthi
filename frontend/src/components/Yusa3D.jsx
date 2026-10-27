@@ -7,18 +7,25 @@ const MOOD_CONFIG = {
   HAPPY:      { color: '#ff9ebd', eye: 'happy', browL: 0, browR: 0, browY: 1.0, mouth: 'happy', blush: 1, accent: 'none' },
   OVERJOYED:  { color: '#ff4d6d', eye: 'starry', browL: 0, browR: 0, browY: 1.0, mouth: 'overjoyed', blush: 1, accent: 'sparkle' },
   SAD:        { color: '#93c5fd', eye: 'open', browL: 0.35, browR: -0.35, browY: 0.32, mouth: 'sad', blush: 0, accent: 'tears' },
+  DISTRESSED: { color: '#93c5fd', eye: 'open', browL: 0.38, browR: -0.38, browY: 0.30, mouth: 'sad', blush: 0, accent: 'tears' },
+  HURT:       { color: '#93c5fd', eye: 'open', browL: 0.35, browR: -0.35, browY: 0.32, mouth: 'sad', blush: 0, accent: 'tears' },
   ANGRY:      { color: '#ef4444', eye: 'open', browL: -0.785, browR: 0.785, browY: 0.28, mouth: 'angry', blush: 0, accent: 'anger' },
+  FRUSTRATED: { color: '#f87171', eye: 'open', browL: -0.6, browR: 0.6, browY: 0.30, mouth: 'angry', blush: 0, accent: 'anger' },
   ANXIOUS:    { color: '#fb923c', eye: 'open', browL: 0.2, browR: -0.2, browY: 0.36, mouth: 'anxious', blush: 0, accent: 'sweat' },
+  STRESSED:   { color: '#fb923c', eye: 'open', browL: 0.25, browR: -0.25, browY: 0.35, mouth: 'anxious', blush: 0, accent: 'sweat' },
+  OVERWHELMED:{ color: '#f97316', eye: 'open', browL: 0.28, browR: -0.28, browY: 0.34, mouth: 'anxious', blush: 0, accent: 'sweat' },
   SCARED:     { color: '#7d8fa3', eye: 'open', browL: 0.3, browR: -0.3, browY: 0.32, mouth: 'scared', blush: 0, accent: 'tremble' },
-  LONELY:     { color: '#ff9ebd', eye: 'open', browL: 0.3, browR: -0.3, browY: 0.32, mouth: 'sad', blush: 0, accent: 'none' },
+  LONELY:     { color: '#c4b5fd', eye: 'open', browL: 0.3, browR: -0.3, browY: 0.32, mouth: 'sad', blush: 0, accent: 'none' },
   TIRED:      { color: '#a8a2b5', eye: 'open', browL: 0, browR: 0, browY: 0.22, mouth: 'tired', blush: 0, accent: 'z' },
+  EXHAUSTED:  { color: '#a8a2b5', eye: 'open', browL: 0, browR: 0, browY: 0.20, mouth: 'tired', blush: 0, accent: 'z' },
   CONFUSED:   { color: '#fbbf24', eye: 'open', browL: -0.3, browR: -0.3, browY: 0.30, mouth: 'confused', blush: 0, accent: 'question' },
   VERY_SCARED:{ color: '#7d8fa3', eye: 'open', browL: 0.3, browR: -0.3, browY: 0.32, mouth: 'scared', blush: 0, accent: 'tremble' },
   CHITTER:    { color: '#ff4d6d', eye: 'happy', browL: 0, browR: 0, browY: 1.0, mouth: 'happy', blush: 1, accent: 'sparkle' },
 };
 
 function getMoodConfig(mood) {
-  return MOOD_CONFIG[mood] || MOOD_CONFIG.NORMAL;
+  const m = (mood || 'NORMAL').toUpperCase().trim();
+  return MOOD_CONFIG[m] || MOOD_CONFIG.NORMAL;
 }
 
 function createCushionShape() {

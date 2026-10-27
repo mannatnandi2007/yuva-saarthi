@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 import YusaCompanion from '../components/YusaCompanion.jsx';
 import Signup from './Signup.jsx';
-import ThemeToggle from '../components/ThemeToggle.jsx';
 
 export default function LandingPage({ onGetStarted, onLogin, onOpenPolicies, onComplete }) {
   const [authView, setAuthView] = useState(null); // null (Center Landing), 'signup', or 'login'
@@ -537,7 +536,6 @@ export default function LandingPage({ onGetStarted, onLogin, onOpenPolicies, onC
           >
             Safety Charter & Policies
           </button>
-          <ThemeToggle compact />
         </div>
       </footer>
     </div>
