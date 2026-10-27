@@ -1,164 +1,188 @@
-import React from 'react';
-import { Users, Phone, ShieldCheck, X, ShieldAlert } from 'lucide-react';
-
 /**
- * Emergency Contacts Slide-out Drawer
- * Displays the verified emergency contacts and escalation priority (Priority 1 -> 2 -> 3)
+ * Yuva Saarthi — Emergency Contacts Slide-out Drawer
+ * Phase 5 & 6: Displays priority emergency contacts (SMS, Telegram, Email channels)
+ * Flat pastel design system, solid strokes, zero gradients.
  */
+
+import React from 'react';
+import { Users, Phone, X, ShieldAlert, Mail, Send } from 'lucide-react';
+
 export default function ContactsDrawer({ isOpen, onClose, contacts = [] }) {
   if (!isOpen) return null;
 
   return (
-    <div 
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Emergency Contacts Network"
       style={{
         position: 'fixed',
         inset: 0,
         zIndex: 9998,
-        background: 'rgba(9, 3, 6, 0.75)',
-        backdropFilter: 'blur(8px)',
+        backgroundColor: 'rgba(22, 19, 31, 0.55)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
         display: 'flex',
         justifyContent: 'flex-end',
-        transition: 'opacity 0.25s ease'
       }}
       onClick={onClose}
     >
-      <div 
+      <div
         style={{
           width: '100%',
           maxWidth: '420px',
           height: '100%',
-          background: 'var(--bg-secondary)',
-          borderLeft: '1px solid var(--border-glow)',
-          boxShadow: '-8px 0 40px rgba(0, 0, 0, 0.6)',
+          backgroundColor: 'var(--surface)',
+          borderLeft: 'var(--border-width) solid var(--stroke)',
           display: 'flex',
           flexDirection: 'column',
-          padding: '28px 24px',
-          color: 'var(--text-primary)',
-          overflowY: 'auto'
+          padding: '24px 20px',
+          color: 'var(--text)',
+          overflowY: 'auto',
+          boxShadow: 'var(--shadow-hard-lg)',
         }}
         onClick={(e) => e.stopPropagation()}
-        className="animate-slideleft"
       >
-        {/* Drawer Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ 
-              width: '36px', height: '36px', borderRadius: '10px', 
-              background: 'rgba(255, 30, 86, 0.12)', border: '1px solid rgba(255, 30, 86, 0.3)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              <Users size={18} color="var(--accent-crimson)" />
+        {/* Header */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '20px',
+            borderBottom: 'var(--border-width) solid var(--stroke)',
+            paddingBottom: '16px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: 'var(--radius-pill)',
+                backgroundColor: 'var(--mint)',
+                border: 'var(--border-width) solid var(--stroke)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#16131F',
+              }}
+            >
+              <Users size={18} strokeWidth={2.5} />
             </div>
             <div>
-              <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-pink)', letterSpacing: '0.1em' }}>
-                SAFETY NETWORK
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                Safety Network
               </div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '800', margin: 0 }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, fontFamily: 'var(--font-heading)', margin: 0 }}>
                 Emergency Contacts
               </h3>
             </div>
           </div>
 
           <button
+            type="button"
             onClick={onClose}
+            aria-label="Close contacts drawer"
             style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: '8px',
-              color: 'var(--text-muted)',
+              width: '36px',
+              height: '36px',
+              borderRadius: 'var(--radius-pill)',
+              border: 'var(--border-width) solid var(--stroke)',
+              backgroundColor: 'var(--surface-2)',
+              color: 'var(--text)',
               cursor: 'pointer',
-              padding: '6px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
             }}
           >
-            <X size={16} />
+            <X size={18} strokeWidth={2.5} />
           </button>
         </div>
 
-        {/* Priority Order Info */}
-        <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', lineHeight: '1.5', marginTop: 0, marginBottom: '20px' }}>
-          In the event of an acute self-harm crisis, Yuva Saarthi dispatches sequential emergency voice alerts to these contacts in exact numerical order.
-        </p>
+        {/* Safety Policy Notice */}
+        <div
+          style={{
+            padding: '12px 14px',
+            backgroundColor: 'var(--surface-2)',
+            borderRadius: 'var(--radius-md)',
+            border: 'var(--border-width) solid var(--stroke)',
+            marginBottom: '20px',
+            fontSize: '12px',
+            lineHeight: 1.5,
+            color: 'var(--text)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, marginBottom: '4px' }}>
+            <ShieldAlert size={14} strokeWidth={2.5} color="var(--coral)" />
+            <span>How Contacts Are Reached</span>
+          </div>
+          Contacts are only alerted if extreme self-harm is detected. Notifications are sent sequentially (Priority 1, then 2, then 3). Abuse disclosures are strictly kept confidential and never sent to personal contacts.
+        </div>
 
         {/* Contacts List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1 }}>
-          {contacts && contacts.length > 0 ? (
-            contacts
-              .slice()
-              .sort((a, b) => (a.priority_order || 1) - (b.priority_order || 1))
-              .map((c, idx) => {
-                const priority = c.priority_order || idx + 1;
-                const name = c.first_name || c.name || `Contact #${priority}`;
-                const rel = c.relationship || 'Emergency Contact';
-                const phone = c.phone || '—';
-
-                return (
-                  <div
-                    key={c.id || idx}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
+          {contacts.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)', fontSize: '14px' }}>
+              No emergency contacts configured yet.
+            </div>
+          ) : (
+            contacts.map((c, i) => (
+              <div
+                key={c.id || i}
+                style={{
+                  padding: '14px 16px',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'var(--surface)',
+                  border: 'var(--border-width) solid var(--stroke)',
+                  boxShadow: 'var(--shadow-hard-sm)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 700, fontSize: '15px' }}>
+                    {c.name || `Contact ${i + 1}`}
+                  </span>
+                  <span
                     style={{
-                      background: 'rgba(255, 255, 255, 0.03)',
-                      border: '1px solid var(--border-subtle)',
-                      borderRadius: '14px',
-                      padding: '16px',
-                      position: 'relative',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px'
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      backgroundColor: i === 0 ? 'var(--lilac)' : 'var(--surface-2)',
+                      color: '#16131F',
+                      padding: '2px 8px',
+                      borderRadius: 'var(--radius-pill)',
+                      border: '1px solid var(--stroke)',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ 
-                        fontSize: '0.72rem', 
-                        fontFamily: 'var(--font-mono)', 
-                        padding: '3px 8px', 
-                        borderRadius: '6px',
-                        background: priority === 1 ? 'rgba(255, 30, 86, 0.2)' : 'rgba(244, 114, 182, 0.1)',
-                        color: priority === 1 ? 'var(--accent-crimson)' : 'var(--accent-pink)',
-                        fontWeight: '700'
-                      }}>
-                        PRIORITY #{priority}
-                      </span>
-                      <ShieldCheck size={16} color="var(--accent-pink)" />
-                    </div>
+                    Priority {c.priority || i + 1}
+                  </span>
+                </div>
 
-                    <div style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                      {name}
-                    </div>
+                <div style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Phone size={13} strokeWidth={2.5} />
+                  <span>{c.phone_number || c.phone || 'No phone'}</span>
+                </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.84rem', color: 'var(--text-muted)' }}>
-                      <span>Relationship: <strong style={{ color: 'var(--text-secondary)' }}>{rel}</strong></span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.86rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                      <Phone size={14} color="var(--accent-crimson)" />
-                      <span style={{ fontFamily: 'var(--font-mono)' }}>{phone}</span>
-                    </div>
+                {c.email && (
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Mail size={12} strokeWidth={2.5} />
+                    <span>{c.email}</span>
                   </div>
-                );
-              })
-          ) : (
-            <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
-              No emergency contacts registered yet.
-            </div>
+                )}
+
+                {c.telegram_chat_id && (
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Send size={12} strokeWidth={2.5} />
+                    <span>Telegram ID: {c.telegram_chat_id}</span>
+                  </div>
+                )}
+              </div>
+            ))
           )}
         </div>
-
-        {/* Abuse safeguard reminder box */}
-        <div style={{ 
-          marginTop: 'auto', 
-          padding: '14px 16px', 
-          background: 'rgba(255, 30, 86, 0.06)', 
-          border: '1px solid rgba(255, 30, 86, 0.2)', 
-          borderRadius: '12px',
-          display: 'flex',
-          gap: '10px'
-        }}>
-          <ShieldAlert size={18} color="var(--accent-crimson)" style={{ flexShrink: 0, marginTop: '2px' }} />
-            <strong style={{ color: 'var(--accent-rose)' }}>Safe Haven Policy:</strong> If family safety or domestic concerns are detected, your contacts will never be dialed to protect your privacy and safety.
-        </div>
-
       </div>
     </div>
   );

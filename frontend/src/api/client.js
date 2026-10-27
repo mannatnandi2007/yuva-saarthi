@@ -27,7 +27,8 @@ apiClient.interceptors.request.use((config) => {
       if (token && token.length > 20) {
         config.headers.Authorization = `Bearer ${token}`;
       }
-      if (parsed?.user_id) {
+      // Send X-Dev-User-Id header ONLY during local development (Phase 6 / 8 security requirement)
+      if (import.meta.env.DEV && parsed?.user_id) {
         config.headers['X-Dev-User-Id'] = parsed.user_id;
       }
     }

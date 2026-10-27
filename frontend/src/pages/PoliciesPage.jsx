@@ -1,12 +1,11 @@
-import React, { useEffect } from 'react';
-import { ShieldCheck, HeartHandshake, AlertTriangle, EyeOff, Sparkles, ArrowLeft, PhoneCall } from 'lucide-react';
-import BrainLogo from '../components/BrainLogo.jsx';
-
 /**
- * Dedicated Safety Policies & Transparency Page
- * Reference: PRD safety charter with all PRD rule numbers (§3.4a, §5.2) removed.
- * Formatted into clear, human-centered safety pointers.
+ * Yuva Saarthi — Dedicated Safety Policies & Transparency Page
+ * Phase 6: Flat pastel design system, solid strokes, zero gradients.
  */
+
+import React, { useEffect } from 'react';
+import { ShieldCheck, HeartHandshake, AlertTriangle, EyeOff, ArrowLeft, PhoneCall } from 'lucide-react';
+
 export default function PoliciesPage({ onBack, onMarkAsRead }) {
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -16,187 +15,246 @@ export default function PoliciesPage({ onBack, onMarkAsRead }) {
   }, [onMarkAsRead]);
 
   return (
-    <div style={{ maxWidth: '760px', margin: '30px auto', padding: '24px' }} className="animate-slideup">
-      <div className="glass-panel" style={{ padding: '36px 40px' }}>
-        
+    <div
+      style={{
+        maxWidth: '760px',
+        margin: '30px auto',
+        padding: '24px 20px',
+        color: 'var(--text)',
+        fontFamily: 'var(--font-body)',
+      }}
+    >
+      <div
+        style={{
+          padding: '36px 32px',
+          backgroundColor: 'var(--surface)',
+          border: 'var(--border-width) solid var(--stroke)',
+          borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-hard)',
+        }}
+      >
         {/* Navigation & Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
           <button
+            type="button"
             onClick={onBack}
-            className="hallmark-btn-secondary"
-            style={{ padding: '8px 14px', fontSize: '0.82rem', gap: '6px' }}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 'var(--radius-pill)',
+              backgroundColor: 'var(--surface-2)',
+              border: '1.5px solid var(--stroke)',
+              color: 'var(--text)',
+              fontSize: '13px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
           >
-            <ArrowLeft size={15} />
-            <span>Back to Previous Screen</span>
+            <ArrowLeft size={15} strokeWidth={2.5} />
+            <span>Back</span>
           </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <BrainLogo size={28} />
-            <span style={{ fontFamily: 'var(--font-display)', fontWeight: '700', fontSize: '0.92rem', color: 'var(--text-secondary)' }}>
-              Yuva Saarthi Charter
-            </span>
-          </div>
+          <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '15px' }}>
+            Yuva Saarthi Charter
+          </span>
         </div>
 
-        <header style={{ textAlign: 'center', marginBottom: '36px' }}>
-          <div style={{ display: 'inline-flex', padding: '12px', borderRadius: '16px', background: 'rgba(59, 130, 246, 0.1)', marginBottom: '14px' }}>
-            <ShieldCheck size={40} color="var(--accent-blue)" />
+        <header style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: 'var(--radius-pill)',
+              backgroundColor: 'var(--lilac)',
+              border: 'var(--border-width) solid var(--stroke)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#16131F',
+              marginBottom: '12px',
+            }}
+          >
+            <ShieldCheck size={28} strokeWidth={2.5} />
           </div>
-          <h1 style={{ fontSize: '2rem', fontFamily: 'var(--font-display)', fontWeight: '800', marginBottom: '8px', color: 'var(--text-primary)' }}>
+          <h1 style={{ fontSize: '28px', fontFamily: 'var(--font-heading)', fontWeight: 800, marginBottom: '8px' }}>
             Safety Net, Not Surveillance
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.96rem', maxWidth: '540px', margin: '0 auto' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '15px', maxWidth: '540px', margin: '0 auto' }}>
             How Yuva Saarthi protects your privacy, handles sensitive disclosures, and keeps you safe.
           </p>
         </header>
 
-        {/* Safety Pointers without PRD numbering */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '22px', marginBottom: '36px' }}>
-          
-          {/* Pointer 1: Confidential Chat Space */}
-          <div style={{ 
-            display: 'flex', 
-            gap: '16px', 
-            padding: '20px', 
-            borderRadius: '14px', 
-            background: 'rgba(255, 255, 255, 0.02)', 
-            border: '1px solid var(--border-subtle)' 
-          }}>
-            <EyeOff size={24} style={{ color: 'var(--accent-cyan)', flexShrink: 0, marginTop: '2px' }} />
-            <div>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '4px', color: 'var(--text-primary)' }}>
-                1. Complete Conversation Confidentiality
-              </h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                Your chats, emotions, and journal entries are private. They are never sold, shared with advertisers, or displayed to anyone else. Even if an emergency alert is triggered, <strong>your personal message transcripts are never shown or read out to your emergency contacts</strong>.
-              </p>
-            </div>
-          </div>
-
-          {/* Pointer 2: Emergency Safety Net */}
-          <div style={{ 
-            display: 'flex', 
-            gap: '16px', 
-            padding: '20px', 
-            borderRadius: '14px', 
-            background: 'rgba(255, 255, 255, 0.02)', 
-            border: '1px solid var(--border-subtle)' 
-          }}>
-            <HeartHandshake size={24} style={{ color: 'var(--accent-blue)', flexShrink: 0, marginTop: '2px' }} />
-            <div>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '4px', color: 'var(--text-primary)' }}>
-                2. Emergency Loved-One Outreach
-              </h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                If our safety system detects imminent life-threatening danger or active self-harm, it will reach out sequentially to your chosen emergency contacts (e.g. parent or trusted friend) so someone in your physical life knows you need support right now.
-              </p>
-            </div>
-          </div>
-
-          {/* Pointer 3: Abuse Safeguard Protection */}
-          <div style={{ 
-            display: 'flex', 
-            gap: '16px', 
-            padding: '20px', 
-            borderRadius: '14px', 
-            background: 'rgba(59, 130, 246, 0.07)', 
-            border: '1px solid rgba(59, 130, 246, 0.3)' 
-          }}>
-            <AlertTriangle size={24} style={{ color: 'var(--accent-cyan)', flexShrink: 0, marginTop: '2px' }} />
-            <div>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '4px', color: 'var(--accent-cyan)' }}>
-                3. The Safe Haven Abuse Protection Safeguard
-              </h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                If you disclose domestic violence, physical violence, or caregiver abuse, <strong>the system will NEVER contact your personal emergency contacts</strong>, because reaching out to personal contacts could put you in greater danger. Instead, the companion connects you directly to verified national protective services like Childline (1098) or KIRAN (1800-599-0019).
-              </p>
-            </div>
-          </div>
-
-          {/* Pointer 4: Gentle Context Memory */}
-          <div style={{ 
-            display: 'flex', 
-            gap: '16px', 
-            padding: '20px', 
-            borderRadius: '14px', 
-            background: 'rgba(255, 255, 255, 0.02)', 
-            border: '1px solid var(--border-subtle)' 
-          }}>
-            <Sparkles size={24} style={{ color: '#93c5fd', flexShrink: 0, marginTop: '2px' }} />
-            <div>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '4px', color: 'var(--text-primary)' }}>
-                4. Gentle Conversational Memory
-              </h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                To save you from re-explaining your challenges every time you open the app, our system retains a gentle, rolling 150-word summary of past interactions. This context is encrypted and strictly scoped to your private profile.
-              </p>
-            </div>
-          </div>
-
-          {/* Pointer 5: Full Data Control & Deletion */}
-          <div style={{ 
-            display: 'flex', 
-            gap: '16px', 
-            padding: '20px', 
-            borderRadius: '14px', 
-            background: 'rgba(255, 255, 255, 0.02)', 
-            border: '1px solid var(--border-subtle)' 
-          }}>
-            <ShieldCheck size={24} style={{ color: '#60a5fa', flexShrink: 0, marginTop: '2px' }} />
-            <div>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '4px', color: 'var(--text-primary)' }}>
-                5. Total Data Ownership & Right to Be Forgotten
-              </h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                You have unconditional control over your data. You can trigger an instant session wipe or request complete account erasure at any time.
-              </p>
-            </div>
-          </div>
-
-        </div>
-
-        {/* Dedicated Helplines Bar */}
-        <div style={{
-          background: 'rgba(15, 23, 42, 0.8)',
-          border: '1px solid var(--border-medium)',
-          borderRadius: '14px',
-          padding: '18px 22px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '14px',
-          marginBottom: '32px'
-        }}>
-          <div>
-            <div style={{ fontSize: '0.86rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '2px' }}>
-              National Emergency Helplines Available 24/7
-            </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-              Tele-MANAS: 14416 | Childline: 1098 | KIRAN Mental Health: 1800-599-0019
-            </div>
-          </div>
-          <a
-            href="tel:14416"
-            className="hallmark-btn-secondary"
-            style={{ padding: '8px 14px', fontSize: '0.82rem', gap: '6px' }}
+        {/* Safety Pointers */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', marginBottom: '32px' }}>
+          {/* Pointer 1 */}
+          <div
+            style={{
+              display: 'flex',
+              gap: '14px',
+              padding: '18px',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: 'var(--surface-2)',
+              border: '1.5px solid var(--stroke)',
+            }}
           >
-            <PhoneCall size={14} color="var(--accent-cyan)" />
-            <span>Call 14416</span>
-          </a>
-        </div>
+            <ShieldCheck size={22} strokeWidth={2.5} style={{ color: 'var(--lilac)', flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>
+                Total Confidentiality by Default
+              </h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.55 }}>
+                Your private chats are encrypted and never shared with parents, guardians, teachers, or schools. Only you and your companion have access to your thoughts and conversations.
+              </p>
+            </div>
+          </div>
 
-        {/* Bottom Action */}
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <button
-            onClick={onBack}
-            className="hallmark-btn-primary"
-            style={{ padding: '12px 28px', fontSize: '0.92rem' }}
+          {/* Pointer 2 */}
+          <div
+            style={{
+              display: 'flex',
+              gap: '14px',
+              padding: '18px',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: 'var(--surface-2)',
+              border: '1.5px solid var(--stroke)',
+            }}
           >
-            I Have Reviewed the Safety Policies
-          </button>
+            <HeartHandshake size={22} strokeWidth={2.5} style={{ color: 'var(--pink)', flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>
+                When Emergency Escalation Triggers
+              </h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.55 }}>
+                If you express active self-harm intent, Yuva Saarthi contacts your designated emergency contacts sequentially via phone calls and automated SMS/Telegram/Email notifications to check on you. <strong>Your private message history is NEVER disclosed to them.</strong>
+              </p>
+            </div>
+          </div>
+
+          {/* Pointer 3 */}
+          <div
+            style={{
+              display: 'flex',
+              gap: '14px',
+              padding: '18px',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: 'var(--coral)',
+              color: '#16131F',
+              border: '1.5px solid var(--stroke)',
+            }}
+          >
+            <AlertTriangle size={22} strokeWidth={2.5} style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '4px' }}>
+                Safe Haven Protection for Abuse Disclosures
+              </h3>
+              <p style={{ fontSize: '13px', lineHeight: 1.55 }}>
+                If you disclose domestic violence or caregiver abuse, the system <strong>strictly does not notify</strong> your personal contacts, as doing so might put you in danger. We provide direct connections to verified national helplines instead.
+              </p>
+            </div>
+          </div>
+
+          {/* Pointer 4 */}
+          <div
+            style={{
+              display: 'flex',
+              gap: '14px',
+              padding: '18px',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: 'var(--surface-2)',
+              border: '1.5px solid var(--stroke)',
+            }}
+          >
+            <EyeOff size={22} strokeWidth={2.5} style={{ color: 'var(--mint)', flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>
+                Right to Delete and Session Reset
+              </h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.55 }}>
+                You have unconditional right to wipe any conversation session or bulk-delete your entire history.
+              </p>
+            </div>
+          </div>
         </div>
 
+        {/* National Helplines Box */}
+        <div
+          style={{
+            padding: '20px',
+            borderRadius: 'var(--radius-md)',
+            backgroundColor: 'var(--surface-2)',
+            border: 'var(--border-width) solid var(--stroke)',
+          }}
+        >
+          <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '10px' }}>
+            Verified 24/7 National Helplines
+          </h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+            <a
+              href="tel:14416"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: 'var(--radius-pill)',
+                backgroundColor: 'var(--surface)',
+                color: 'var(--text)',
+                border: '1.5px solid var(--stroke)',
+                fontSize: '13px',
+                fontWeight: 600,
+                textDecoration: 'none',
+                boxShadow: 'var(--shadow-hard-sm)',
+              }}
+            >
+              <PhoneCall size={14} strokeWidth={2.5} />
+              <span>Tele-MANAS: <strong>14416</strong></span>
+            </a>
+
+            <a
+              href="tel:18005990019"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: 'var(--radius-pill)',
+                backgroundColor: 'var(--surface)',
+                color: 'var(--text)',
+                border: '1.5px solid var(--stroke)',
+                fontSize: '13px',
+                fontWeight: 600,
+                textDecoration: 'none',
+                boxShadow: 'var(--shadow-hard-sm)',
+              }}
+            >
+              <PhoneCall size={14} strokeWidth={2.5} />
+              <span>KIRAN Mental Health: <strong>1800-599-0019</strong></span>
+            </a>
+
+            <a
+              href="tel:1098"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: 'var(--radius-pill)',
+                backgroundColor: 'var(--surface)',
+                color: 'var(--text)',
+                border: '1.5px solid var(--stroke)',
+                fontSize: '13px',
+                fontWeight: 600,
+                textDecoration: 'none',
+                boxShadow: 'var(--shadow-hard-sm)',
+              }}
+            >
+              <PhoneCall size={14} strokeWidth={2.5} />
+              <span>Childline India: <strong>1098</strong></span>
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   );

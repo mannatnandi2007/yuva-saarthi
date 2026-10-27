@@ -5,19 +5,34 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/icon.svg" />
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#ec4899" />
+    <meta id="theme-color-meta" name="theme-color" content="#EEF0FB" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Yuva Saarthi" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    
     <!-- SEO Title Tag & Description -->
     <title>Yuva Saarthi — Youth Mental Well-being Companion</title>
     <meta name="description" content="A warm, confidential mental well-being companion designed specifically for Indian youth. Talk freely, express your emotions, and feel supported 24/7." />
-    
-    <!-- Hallmark Approved Fonts: Plus Jakarta Sans & Outfit -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Synchronous theme loader before first paint to eliminate flash of light/dark -->
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('yuva_theme') || 'system';
+          var isDark = saved === 'dark' || (saved === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (isDark) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            var meta = document.getElementById('theme-color-meta');
+            if (meta) meta.setAttribute('content', '#13111C');
+          } else {
+            document.documentElement.removeAttribute('data-theme');
+            var meta = document.getElementById('theme-color-meta');
+            if (meta) meta.setAttribute('content', '#EEF0FB');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

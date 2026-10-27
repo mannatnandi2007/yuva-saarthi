@@ -1,19 +1,37 @@
-// Yuva Saarthi — Modern Aesthetic Onboarding & Login
-// Redesigned with strict 10-digit Indian phone inputs, fixed +91 prefix, and dark glassmorphism
+/**
+ * Yuva Saarthi — Onboarding & Login Page
+ * Phase 5 & 6: Modern flat pastel aesthetic, zero gradients, solid strokes.
+ * Pure SVG YusaCompanion, multi-channel emergency contacts (Phone + optional Telegram/Email).
+ */
 
 import React, { useState } from 'react';
-import { User, Phone, Users, ShieldAlert, Plus, Trash2, AlertCircle, ArrowRight, Sparkles, Heart } from 'lucide-react';
-import axios from 'axios';
-import YusaSideMascot from '../components/YusaSideMascot.jsx';
+import {
+  User,
+  Phone,
+  Users,
+  ShieldAlert,
+  Plus,
+  Trash2,
+  AlertCircle,
+  ArrowRight,
+  Send,
+  Mail,
+  Lock,
+} from 'lucide-react';
+import apiClient from '../api/client.js';
+import YusaCompanion from '../components/YusaCompanion.jsx';
 
-// BUG-010 FIX: Use VITE_API_URL env variable for production deployments (Vercel)
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
-export default function Signup({ onComplete, onNavigate, initialMode = 'signup', onBackToLanding = null, hideSideMascot = false }) {
+export default function Signup({
+  onComplete,
+  onNavigate,
+  initialMode = 'signup',
+  onBackToLanding = null,
+  hideSideMascot = false,
+}) {
   const [isLoginMode, setIsLoginMode] = useState(initialMode === 'login');
   const [loginUsername, setLoginUsername] = useState('');
 
-  // Sign up state - phone stores pure 10 digits
+  // Sign up state
   const [username, setUsername] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -24,40 +42,55 @@ export default function Signup({ onComplete, onNavigate, initialMode = 'signup',
 
   // Array of emergency contacts (max 3, min 1)
   const [contacts, setContacts] = useState([
-    { first_name: '', last_name: '', phone: '', relationship: 'Parent', priority_order: 1 }
+    {
+      first_name: '',
+      last_name: '',
+      phone: '',
+      email: '',
+      telegram_chat_id: '',
+      relationship: 'Parent',
+      priority_order: 1,
+    },
   ]);
 
   const addContact = () => {
     if (contacts.length < 3) {
       setContacts([
         ...contacts,
-        { first_name: '', last_name: '', phone: '', relationship: 'Guardian', priority_order: contacts.length + 1 }
+        {
+          first_name: '',
+          last_name: '',
+          phone: '',
+          email: '',
+          telegram_chat_id: '',
+          relationship: 'Guardian',
+          priority_order: contacts.length + 1,
+        },
       ]);
     }
   };
 
   const removeContact = (index) => {
-    const updated = contacts.filter((_, i) => i !== index)
+    const updated = contacts
+      .filter((_, i) => i !== index)
       .map((c, i) => ({ ...c, priority_order: i + 1 }));
     setContacts(updated);
-    setError(null);
   };
 
   const updateContact = (index, field, value) => {
     const updated = [...contacts];
-    updated[index][field] = value;
+    updated[index] = { ...updated[index], [field]: value };
     setContacts(updated);
-    setError(null);
   };
 
-  // 10-digit exact matching checks
-  const doesMatchUserPhone = (contactPhone) => {
-    return userPhone.length === 10 && contactPhone.length === 10 && userPhone === contactPhone;
+  const handlePhoneChange = (setter) => (e) => {
+    const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
+    setter(digitsOnly);
   };
 
-  const isDuplicateContactPhone = (contactPhone, currentIndex) => {
-    if (contactPhone.length !== 10) return false;
-    return contacts.some((c, i) => i !== currentIndex && c.phone === contactPhone);
+  const handleContactPhoneChange = (index) => (e) => {
+    const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
+    updateContact(index, 'phone', digitsOnly);
   };
 
   const handleDirectLogin = async (e) => {
@@ -65,19 +98,19 @@ export default function Signup({ onComplete, onNavigate, initialMode = 'signup',
     setError(null);
     const clean = loginUsername.trim().toLowerCase();
     if (!clean) {
-      setError("Please enter your username.");
+      setError('Please enter your username.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const res = await axios.post(`${API_BASE_URL}/auth/login`, { username: clean });
-      if (res.data?.status === 'success') {
+      const res = await apiClient.post('/auth/login', { username: clean });
+      if (res.data?.status === 'success' || res.data?.user_id) {
         onComplete(res.data);
         onNavigate('chat');
       }
     } catch (err) {
-      const msg = err.response?.data?.detail || "Could not find account. Please check username or create an account.";
+      const msg = err.response?.data?.detail || 'Could not find account. Please check username or create an account.';
       setError(msg);
     } finally {
       setIsSubmitting(false);
@@ -90,24 +123,23 @@ export default function Signup({ onComplete, onNavigate, initialMode = 'signup',
 
     const cleanUsername = username.trim().toLowerCase();
     if (!cleanUsername || cleanUsername.length < 3) {
-      setError("Username must be at least 3 characters long.");
+      setError('Username must be at least 3 characters long.');
       return;
     }
     if (!/^[a-zA-Z0-9_.-]+$/.test(cleanUsername)) {
-      setError("Username can only contain letters, numbers, hyphens, and underscores.");
+      setError('Username can only contain letters, numbers, hyphens, and underscores.');
       return;
     }
     if (!firstName.trim()) {
-      setError("Please enter your first name.");
+      setError('Please enter your first name.');
       return;
     }
     if (!lastName.trim()) {
-      setError("Please enter your last name.");
+      setError('Please enter your last name.');
       return;
     }
-
     if (userPhone.length !== 10) {
-      setError("Please enter your 10-digit mobile number.");
+      setError('Please enter your 10-digit mobile number.');
       return;
     }
 
@@ -122,17 +154,14 @@ export default function Signup({ onComplete, onNavigate, initialMode = 'signup',
         setError(`Please enter the last name for emergency contact #${i + 1}.`);
         return;
       }
-
       if (c.phone.length !== 10) {
         setError(`Please enter a valid 10-digit mobile number for ${c.first_name} (Contact #${i + 1}).`);
         return;
       }
-
       if (userPhone === c.phone) {
         setError(`Emergency contact #${i + 1} (${c.first_name}) cannot be your own phone number.`);
         return;
       }
-
       if (seenContacts.has(c.phone)) {
         setError(`Emergency contact #${i + 1} has a duplicate mobile number.`);
         return;
@@ -149,23 +178,25 @@ export default function Signup({ onComplete, onNavigate, initialMode = 'signup',
       age_band: ageBand,
       consent_given: true,
       policy_ack: true,
-      emergency_contacts: contacts.map(c => ({
+      emergency_contacts: contacts.map((c) => ({
         first_name: c.first_name.trim(),
         last_name: c.last_name.trim(),
         relationship: c.relationship,
         phone: `+91${c.phone}`,
-        priority_order: c.priority_order
-      }))
+        email: c.email ? c.email.trim() : null,
+        telegram_chat_id: c.telegram_chat_id ? c.telegram_chat_id.trim() : null,
+        priority_order: c.priority_order,
+      })),
     };
 
     try {
-      const res = await axios.post(`${API_BASE_URL}/auth/signup`, payload);
-      if (res.data?.status === 'success') {
+      const res = await apiClient.post('/auth/signup', payload);
+      if (res.data?.status === 'success' || res.data?.user_id) {
         onComplete(res.data);
         onNavigate('consent');
       }
     } catch (err) {
-      const msg = err.response?.data?.detail || "Registration failed. Please try again.";
+      const msg = err.response?.data?.detail || 'Registration failed. Please check details and try again.';
       setError(msg);
     } finally {
       setIsSubmitting(false);
@@ -173,119 +204,129 @@ export default function Signup({ onComplete, onNavigate, initialMode = 'signup',
   };
 
   return (
-    <div 
-      style={{ 
-        width: '100%', 
-        maxWidth: hideSideMascot ? '520px' : '1020px', 
+    <div
+      style={{
+        width: '100%',
+        maxWidth: hideSideMascot ? '520px' : '980px',
         margin: 'auto',
         display: 'grid',
         gridTemplateColumns: hideSideMascot ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))',
-        gap: '36px',
+        gap: '32px',
         alignItems: 'center',
-        padding: '16px 0'
-      }} 
-      className="animate-slideup"
+        padding: '16px 0',
+      }}
     >
-      {/* ── JUMPING & CHITTERING YUSA AT THE SIDE ── */}
+      {/* ── LEFT COLUMN: YUSA COMPANION ── */}
       {!hideSideMascot && (
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          textAlign: 'center',
-          gap: '16px',
-          padding: '24px 16px',
-          background: '#ffffff',
-          borderRadius: '28px',
-          border: '1.5px solid rgba(236, 72, 153, 0.25)',
-          boxShadow: '0 8px 30px rgba(168, 85, 247, 0.08)'
-        }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center',
+            gap: '16px',
+            padding: '24px 16px',
+            backgroundColor: 'var(--surface)',
+            borderRadius: 'var(--radius-lg)',
+            border: 'var(--border-width) solid var(--stroke)',
+            boxShadow: 'var(--shadow-hard)',
+          }}
+        >
           {onBackToLanding && (
             <button
               type="button"
               onClick={onBackToLanding}
               style={{
-                background: '#fdf2f8',
-                border: '1px solid #fbcfe8',
-                color: '#db2777',
+                alignSelf: 'flex-start',
+                background: 'var(--surface-2)',
+                border: '1.5px solid var(--stroke)',
+                color: 'var(--text)',
                 padding: '6px 14px',
-                borderRadius: '9999px',
-                fontSize: '0.78rem',
+                borderRadius: 'var(--radius-pill)',
+                fontSize: '12px',
                 fontWeight: '700',
                 cursor: 'pointer',
-                marginBottom: '4px'
               }}
             >
               ← Back to Overview
             </button>
           )}
-          <YusaSideMascot size={210} />
-          
+
+          <YusaCompanion mood="normal" size={170} showBubble={false} />
+
           <div style={{ maxWidth: '320px' }}>
-            <h2 style={{ fontSize: '1.35rem', fontWeight: '800', color: '#2e1065', marginBottom: '8px' }}>
-              {isLoginMode ? "Welcome Back to Yuva Saarthi!" : "Say Hi to Yusa ✨"}
+            <h2 style={{ fontSize: '22px', fontWeight: 800, fontFamily: 'var(--font-heading)', color: 'var(--text)', marginBottom: '6px' }}>
+              {isLoginMode ? 'Welcome Back!' : 'Say Hi to Yusa ✨'}
             </h2>
-            <p style={{ fontSize: '0.9rem', color: '#581c87', lineHeight: '1.55' }}>
-              {isLoginMode 
-                ? "Your safe space is ready. Enter your username and let's pick up where we left off." 
-                : "Yusa is jumping with excitement to meet you! Everything you share stays confidential and safe."}
+            <p style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: '1.55' }}>
+              {isLoginMode
+                ? "Your safe space is ready. Enter your username to resume where you left off."
+                : 'Yusa is eager to meet you! Everything you share stays confidential and safe.'}
             </p>
           </div>
 
-          {/* Reassuring micro-badges */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginTop: '4px' }}>
-            <span style={{ fontSize: '0.74rem', background: '#fce7f3', color: '#be185d', padding: '4px 12px', borderRadius: '9999px', fontWeight: '700' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
+            <span style={{ fontSize: '12px', backgroundColor: 'var(--lilac)', color: '#16131F', padding: '4px 12px', borderRadius: 'var(--radius-pill)', fontWeight: 700, border: '1px solid var(--stroke)' }}>
               🔒 100% Private
             </span>
-            <span style={{ fontSize: '0.74rem', background: '#f3e8ff', color: '#7e22ce', padding: '4px 12px', borderRadius: '9999px', fontWeight: '700' }}>
+            <span style={{ fontSize: '12px', backgroundColor: 'var(--yellow)', color: '#16131F', padding: '4px 12px', borderRadius: 'var(--radius-pill)', fontWeight: 700, border: '1px solid var(--stroke)' }}>
               💬 Hinglish Friendly
             </span>
-            <span style={{ fontSize: '0.74rem', background: '#fce7f3', color: '#be185d', padding: '4px 12px', borderRadius: '9999px', fontWeight: '700' }}>
+            <span style={{ fontSize: '12px', backgroundColor: 'var(--mint)', color: '#16131F', padding: '4px 12px', borderRadius: 'var(--radius-pill)', fontWeight: 700, border: '1px solid var(--stroke)' }}>
               ✨ Zero Judgment
             </span>
           </div>
         </div>
       )}
 
-      {/* ── LOGIN & SIGNUP CARD ── */}
-      <div className="glass-panel" style={{ padding: '36px 32px', position: 'relative', overflow: 'hidden', background: '#ffffff', border: '1.5px solid #f3e8ff' }}>
-
-        {/* Card Header */}
-        <div style={{ marginBottom: '22px' }}>
-          <h2 style={{ fontSize: '1.45rem', fontWeight: '800', letterSpacing: '-0.02em', marginBottom: '6px', color: '#2e1065' }}>
-            {isLoginMode ? "Welcome Back" : "Create Safe Account"}
+      {/* ── RIGHT COLUMN: CARD (LOGIN & SIGNUP) ── */}
+      <div
+        style={{
+          padding: '32px 28px',
+          backgroundColor: 'var(--surface)',
+          border: 'var(--border-width) solid var(--stroke)',
+          borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-hard)',
+        }}
+      >
+        {/* Header */}
+        <div style={{ marginBottom: '20px' }}>
+          <h2 style={{ fontSize: '24px', fontWeight: 800, fontFamily: 'var(--font-heading)', color: 'var(--text)', marginBottom: '4px' }}>
+            {isLoginMode ? 'Welcome Back' : 'Create Safe Account'}
           </h2>
-          <p style={{ color: '#581c87', fontSize: '0.86rem', lineHeight: '1.4' }}>
-            {isLoginMode 
-              ? "Sign in with your unique username to resume your confidential conversations."
-              : "Set up your youth profile and trusted emergency safety contacts."}
+          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+            {isLoginMode
+              ? 'Sign in with your username to resume your confidential conversations.'
+              : 'Set up your youth profile and emergency safety contacts.'}
           </p>
         </div>
 
-        {/* Segmented Tab Switcher (Pink & Purple Palette) */}
-        <div style={{
-          display: 'flex',
-          background: 'rgba(168, 85, 247, 0.08)',
-          border: '1px solid rgba(168, 85, 247, 0.15)',
-          borderRadius: '12px',
-          padding: '4px',
-          marginBottom: '24px'
-        }}>
+        {/* Tab Switcher */}
+        <div
+          style={{
+            display: 'flex',
+            backgroundColor: 'var(--surface-2)',
+            border: 'var(--border-width) solid var(--stroke)',
+            borderRadius: 'var(--radius-pill)',
+            padding: '3px',
+            marginBottom: '22px',
+            gap: '4px',
+          }}
+        >
           <button
             type="button"
             onClick={() => { setIsLoginMode(false); setError(null); }}
             style={{
               flex: 1,
-              padding: '9px 14px',
-              borderRadius: '9px',
-              border: 'none',
-              background: !isLoginMode ? '#db2777' : 'transparent',
-              color: !isLoginMode ? '#ffffff' : '#581c87',
-              fontSize: '0.86rem',
-              fontWeight: '700',
+              padding: '8px 14px',
+              borderRadius: 'var(--radius-pill)',
+              border: !isLoginMode ? '2px solid var(--stroke)' : '2px solid transparent',
+              backgroundColor: !isLoginMode ? 'var(--stroke)' : 'transparent',
+              color: !isLoginMode ? 'var(--bg)' : 'var(--text)',
+              fontSize: '13px',
+              fontWeight: 700,
               cursor: 'pointer',
-              boxShadow: !isLoginMode ? '0 2px 8px rgba(219, 39, 119, 0.35)' : 'none',
-              transition: 'all 0.2s ease'
+              transition: 'background-color var(--transition-fast)',
             }}
           >
             Create Account
@@ -295,77 +336,77 @@ export default function Signup({ onComplete, onNavigate, initialMode = 'signup',
             onClick={() => { setIsLoginMode(true); setError(null); }}
             style={{
               flex: 1,
-              padding: '9px 14px',
-              borderRadius: '9px',
-              border: 'none',
-              background: isLoginMode ? '#db2777' : 'transparent',
-              color: isLoginMode ? '#ffffff' : '#581c87',
-              fontSize: '0.86rem',
-              fontWeight: '700',
+              padding: '8px 14px',
+              borderRadius: 'var(--radius-pill)',
+              border: isLoginMode ? '2px solid var(--stroke)' : '2px solid transparent',
+              backgroundColor: isLoginMode ? 'var(--stroke)' : 'transparent',
+              color: isLoginMode ? 'var(--bg)' : 'var(--text)',
+              fontSize: '13px',
+              fontWeight: 700,
               cursor: 'pointer',
-              boxShadow: isLoginMode ? '0 2px 8px rgba(219, 39, 119, 0.35)' : 'none',
-              transition: 'all 0.2s ease'
+              transition: 'background-color var(--transition-fast)',
             }}
           >
             Sign In with Username
           </button>
         </div>
 
-        {/* Error Notification */}
+        {/* Error notification */}
         {error && (
-          <div style={{
-            background: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: '10px',
-            padding: '12px 14px',
-            marginBottom: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            color: '#fca5a5',
-            fontSize: '0.84rem',
-            lineHeight: '1.4'
-          }} className="animate-slideup">
-            <AlertCircle size={17} style={{ flexShrink: 0, color: '#f87171' }} />
+          <div
+            role="alert"
+            style={{
+              backgroundColor: 'var(--coral)',
+              color: '#16131F',
+              border: 'var(--border-width) solid var(--stroke)',
+              borderRadius: 'var(--radius-md)',
+              padding: '10px 14px',
+              marginBottom: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '13px',
+              fontWeight: 600,
+            }}
+          >
+            <AlertCircle size={16} strokeWidth={2.5} style={{ flexShrink: 0 }} />
             <span>{error}</span>
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* TAB 1: SIGN IN WITH USERNAME                                              */}
-        {/* ========================================================================= */}
+        {/* TAB 1: SIGN IN */}
         {isLoginMode ? (
-          <form onSubmit={handleDirectLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <form onSubmit={handleDirectLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', marginBottom: '8px', color: 'var(--text-secondary)' }}>
-                Enter Your Username
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px', color: 'var(--text)' }}>
+                Your Username
               </label>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                background: 'var(--bg-input)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: '10px',
-                padding: '0 14px',
-                transition: 'border-color 0.2s'
-              }}>
-                <span style={{ color: 'var(--accent-pink)', fontWeight: '700', marginRight: '8px', fontSize: '1rem' }}>@</span>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  backgroundColor: 'var(--surface-2)',
+                  border: 'var(--border-width-control) solid var(--stroke)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '0 12px',
+                }}
+              >
+                <User size={16} strokeWidth={2.5} color="var(--text-muted)" style={{ marginRight: '8px' }} />
                 <input
                   type="text"
-                  placeholder="e.g. mannat_n"
+                  required
+                  placeholder="e.g. rahul_k"
                   value={loginUsername}
-                  onChange={(e) => setLoginUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))}
+                  onChange={(e) => setLoginUsername(e.target.value)}
                   style={{
-                    flex: 1,
-                    background: 'transparent',
+                    width: '100%',
+                    padding: '10px 0',
                     border: 'none',
                     outline: 'none',
-                    color: 'var(--text-primary)',
-                    padding: '12px 0',
-                    fontSize: '0.92rem',
-                    fontFamily: 'inherit'
+                    backgroundColor: 'transparent',
+                    color: 'var(--text)',
+                    fontSize: '15px',
                   }}
-                  autoFocus
                 />
               </div>
             </div>
@@ -373,359 +414,398 @@ export default function Signup({ onComplete, onNavigate, initialMode = 'signup',
             <button
               type="submit"
               disabled={isSubmitting}
-              className="hallmark-btn-primary"
-              style={{ width: '100%', padding: '14px', fontSize: '0.98rem' }}
+              style={{
+                width: '100%',
+                padding: '12px 20px',
+                borderRadius: 'var(--radius-pill)',
+                backgroundColor: 'var(--stroke)',
+                color: 'var(--bg)',
+                border: 'var(--border-width-control) solid var(--stroke)',
+                boxShadow: 'var(--shadow-hard)',
+                fontSize: '15px',
+                fontWeight: 700,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                opacity: isSubmitting ? 0.7 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                marginTop: '8px',
+              }}
             >
-              <span>{isSubmitting ? "Opening Safe Space..." : "Open Safe Space"}</span>
-              <ArrowRight size={17} />
+              <span>{isSubmitting ? 'Signing in...' : 'Sign In & Chat'}</span>
+              <ArrowRight size={16} strokeWidth={2.5} />
             </button>
           </form>
         ) : (
-          /* ========================================================================= */
-          /* TAB 2: CREATE ACCOUNT                                                     */
-          /* ========================================================================= */
-          <form onSubmit={handleSignupSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-            
-            {/* Section 1: Profile */}
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.02)',
-              border: '1px solid rgba(255, 255, 255, 0.06)',
-              borderRadius: '14px',
-              padding: '18px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '14px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-cyan)', fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                <User size={14} />
-                <span>Your Profile</span>
-              </div>
-
-              {/* Username */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', marginBottom: '6px', color: 'var(--text-secondary)' }}>
-                  Choose a Unique Username *
-                </label>
-                <div style={{
+          /* TAB 2: SIGN UP */
+          <form onSubmit={handleSignupSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            {/* Username */}
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>
+                Pick a Username <span style={{ color: 'var(--coral)' }}>*</span>
+              </label>
+              <div
+                style={{
                   display: 'flex',
                   alignItems: 'center',
-                  background: 'var(--bg-input)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: '10px',
-                  padding: '0 12px'
-                }}>
-                  <span style={{ color: 'var(--accent-cyan)', fontWeight: '700', marginRight: '6px' }}>@</span>
-                  <input
-                    type="text"
-                    placeholder="e.g. mannat_24"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))}
-                    style={{
-                      flex: 1,
-                      background: 'transparent',
-                      border: 'none',
-                      outline: 'none',
-                      color: 'var(--text-primary)',
-                      padding: '10px 0',
-                      fontSize: '0.88rem',
-                      fontFamily: 'inherit'
-                    }}
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* First & Last Name */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', marginBottom: '6px', color: 'var(--text-secondary)' }}>
-                    First Name *
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="First Name"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="input-field"
-                    required
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', marginBottom: '6px', color: 'var(--text-secondary)' }}>
-                    Last Name *
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Last Name"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="input-field"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Phone (with fixed +91 and 10 digits max) & Age Band */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', marginBottom: '6px', color: 'var(--text-secondary)' }}>
-                    Mobile Number (10 digits) *
-                  </label>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    background: 'var(--bg-input)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: '10px',
-                    padding: '0 10px'
-                  }}>
-                    <span style={{
-                      fontSize: '0.84rem',
-                      fontWeight: '700',
-                      color: 'var(--text-secondary)',
-                      marginRight: '8px',
-                      paddingRight: '8px',
-                      borderRight: '1px solid rgba(255, 255, 255, 0.1)',
-                      userSelect: 'none'
-                    }}>
-                      +91
-                    </span>
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      maxLength={10}
-                      placeholder="98765 43210"
-                      value={userPhone}
-                      onChange={(e) => {
-                        const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
-                        setUserPhone(digits);
-                      }}
-                      style={{
-                        flex: 1,
-                        background: 'transparent',
-                        border: 'none',
-                        outline: 'none',
-                        color: 'var(--text-primary)',
-                        padding: '10px 0',
-                        fontSize: '0.88rem',
-                        fontFamily: 'inherit',
-                        letterSpacing: '0.04em'
-                      }}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', marginBottom: '6px', color: 'var(--text-secondary)' }}>
-                    Age Band *
-                  </label>
-                  <select
-                    value={ageBand}
-                    onChange={(e) => setAgeBand(e.target.value)}
-                    className="input-field"
-                    style={{ backgroundColor: '#0c1429', color: '#f8fafc', cursor: 'pointer' }}
-                  >
-                    <option value="under-13" style={{ backgroundColor: '#090e21', color: '#f8fafc' }}>Under 13</option>
-                    <option value="13-15" style={{ backgroundColor: '#090e21', color: '#f8fafc' }}>13 - 15</option>
-                    <option value="16-17" style={{ backgroundColor: '#090e21', color: '#f8fafc' }}>16 - 17</option>
-                    <option value="18-plus" style={{ backgroundColor: '#090e21', color: '#f8fafc' }}>18 - 20</option>
-                  </select>
-                </div>
+                  backgroundColor: 'var(--surface-2)',
+                  border: 'var(--border-width-control) solid var(--stroke)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '0 12px',
+                }}
+              >
+                <User size={16} strokeWidth={2.5} color="var(--text-muted)" style={{ marginRight: '8px' }} />
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. rahul_2008"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 0',
+                    border: 'none',
+                    outline: 'none',
+                    backgroundColor: 'transparent',
+                    color: 'var(--text)',
+                    fontSize: '15px',
+                  }}
+                />
               </div>
             </div>
 
-            {/* Section 2: Emergency Contacts */}
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.02)',
-              border: '1px solid rgba(255, 255, 255, 0.06)',
-              borderRadius: '14px',
-              padding: '18px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '14px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2dd4bf', fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  <Users size={14} />
-                  <span>Trusted Emergency Contacts</span>
+            {/* First & Last Name */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>
+                  First Name <span style={{ color: 'var(--coral)' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Rahul"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    backgroundColor: 'var(--surface-2)',
+                    border: 'var(--border-width-control) solid var(--stroke)',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'var(--text)',
+                    fontSize: '14px',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>
+                  Last Name <span style={{ color: 'var(--coral)' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Sharma"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    backgroundColor: 'var(--surface-2)',
+                    border: 'var(--border-width-control) solid var(--stroke)',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'var(--text)',
+                    fontSize: '14px',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Mobile & Age Band */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>
+                  Your Mobile Number <span style={{ color: 'var(--coral)' }}>*</span>
+                </label>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    backgroundColor: 'var(--surface-2)',
+                    border: 'var(--border-width-control) solid var(--stroke)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '0 10px',
+                  }}
+                >
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)', marginRight: '6px' }}>+91</span>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="9876543210"
+                    value={userPhone}
+                    onChange={handlePhoneChange(setUserPhone)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 0',
+                      border: 'none',
+                      outline: 'none',
+                      backgroundColor: 'transparent',
+                      color: 'var(--text)',
+                      fontSize: '14px',
+                    }}
+                  />
                 </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>
+                  Age Band
+                </label>
+                <select
+                  value={ageBand}
+                  onChange={(e) => setAgeBand(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 8px',
+                    backgroundColor: 'var(--surface-2)',
+                    border: 'var(--border-width-control) solid var(--stroke)',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'var(--text)',
+                    fontSize: '14px',
+                    outline: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <option value="13-15">13–15 yrs</option>
+                  <option value="16-17">16–17 yrs</option>
+                  <option value="18+">18+ yrs</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Emergency Contacts Section */}
+            <div style={{ marginTop: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div>
+                  <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)' }}>
+                    Emergency Contacts ({contacts.length}/3)
+                  </span>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    Contacted only in severe self-harm emergencies
+                  </div>
+                </div>
+
                 {contacts.length < 3 && (
                   <button
                     type="button"
                     onClick={addContact}
-                    className="btn-secondary"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      backgroundColor: 'var(--surface-2)',
+                      border: '1.5px solid var(--stroke)',
+                      borderRadius: 'var(--radius-pill)',
+                      padding: '4px 10px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
                   >
-                    <Plus size={13} />
+                    <Plus size={12} strokeWidth={2.5} />
                     <span>Add</span>
                   </button>
                 )}
               </div>
 
-              {contacts.map((contact, index) => {
-                const matchesUser = doesMatchUserPhone(contact.phone);
-                const isDuplicate = isDuplicateContactPhone(contact.phone, index);
-                const hasError = matchesUser || isDuplicate;
+              {contacts.map((c, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    backgroundColor: 'var(--surface-2)',
+                    border: 'var(--border-width) solid var(--stroke)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '12px',
+                    marginBottom: '10px',
+                    position: 'relative',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 700, backgroundColor: 'var(--surface)', padding: '2px 8px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--stroke)' }}>
+                      Priority {idx + 1} ({c.relationship})
+                    </span>
 
-                return (
-                  <div
-                    key={index}
-                    style={{
-                      background: 'rgba(0, 0, 0, 0.3)',
-                      border: `1px solid ${hasError ? 'rgba(239, 68, 68, 0.4)' : 'rgba(255, 255, 255, 0.06)'}`,
-                      borderRadius: '12px',
-                      padding: '14px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '10px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{
-                        fontSize: '0.74rem',
-                        fontWeight: '700',
-                        color: index === 0 ? '#c084fc' : '#a1a1aa',
-                        background: index === 0 ? 'rgba(168, 85, 247, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                        padding: '2px 8px',
-                        borderRadius: '6px',
-                        letterSpacing: '0.03em'
-                      }}>
-                        {index === 0 ? "Priority 1 (Primary Contact)" : `Priority ${contact.priority_order}`}
-                      </span>
-
-                      {contacts.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeContact(index)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#71717a',
-                            cursor: 'pointer',
-                            padding: '2px',
-                            display: 'flex',
-                            alignItems: 'center'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
-                          onMouseLeave={(e) => e.currentTarget.style.color = '#71717a'}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Contact Names */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                      <input
-                        type="text"
-                        placeholder="Contact First Name"
-                        value={contact.first_name}
-                        onChange={(e) => updateContact(index, 'first_name', e.target.value)}
-                        className="input-field"
-                        style={{ fontSize: '0.84rem', padding: '9px 12px' }}
-                        required
-                      />
-                      <input
-                        type="text"
-                        placeholder="Contact Last Name"
-                        value={contact.last_name}
-                        onChange={(e) => updateContact(index, 'last_name', e.target.value)}
-                        className="input-field"
-                        style={{ fontSize: '0.84rem', padding: '9px 12px' }}
-                        required
-                      />
-                    </div>
-
-                    {/* Relationship & Phone with +91 fixed badge and 10 digits max */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: '10px' }}>
-                      <select
-                        value={contact.relationship}
-                        onChange={(e) => updateContact(index, 'relationship', e.target.value)}
-                        className="input-field"
-                        style={{ fontSize: '0.84rem', padding: '9px 10px', backgroundColor: '#0c1429', color: '#f8fafc', cursor: 'pointer' }}
+                    {contacts.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeContact(idx)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--coral)',
+                          cursor: 'pointer',
+                          padding: '2px',
+                        }}
                       >
-                        <option value="Parent" style={{ backgroundColor: '#090e21', color: '#f8fafc' }}>Parent</option>
-                        <option value="Guardian" style={{ backgroundColor: '#090e21', color: '#f8fafc' }}>Guardian</option>
-                        <option value="Sibling" style={{ backgroundColor: '#090e21', color: '#f8fafc' }}>Sibling</option>
-                        <option value="Friend" style={{ backgroundColor: '#090e21', color: '#f8fafc' }}>Friend</option>
-                        <option value="Other" style={{ backgroundColor: '#090e21', color: '#f8fafc' }}>Other</option>
-                      </select>
-
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        background: 'var(--bg-input)',
-                        border: `1px solid ${hasError ? '#ef4444' : 'var(--border-subtle)'}`,
-                        borderRadius: '10px',
-                        padding: '0 8px'
-                      }}>
-                        <span style={{
-                          fontSize: '0.8rem',
-                          fontWeight: '700',
-                          color: 'var(--text-secondary)',
-                          marginRight: '6px',
-                          paddingRight: '6px',
-                          borderRight: '1px solid rgba(255, 255, 255, 0.1)',
-                          userSelect: 'none'
-                        }}>
-                          +91
-                        </span>
-                        <input
-                          type="tel"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          maxLength={10}
-                          placeholder="98765 43210"
-                          value={contact.phone}
-                          onChange={(e) => {
-                            const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
-                            updateContact(index, 'phone', digits);
-                          }}
-                          style={{
-                            flex: 1,
-                            background: 'transparent',
-                            border: 'none',
-                            outline: 'none',
-                            color: 'var(--text-primary)',
-                            padding: '9px 0',
-                            fontSize: '0.84rem',
-                            fontFamily: 'inherit',
-                            letterSpacing: '0.04em'
-                          }}
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    {matchesUser && (
-                      <div style={{ color: '#f87171', fontSize: '0.74rem', fontWeight: '500' }}>
-                        Cannot be your own phone number.
-                      </div>
-                    )}
-                    {isDuplicate && (
-                      <div style={{ color: '#f87171', fontSize: '0.74rem', fontWeight: '500' }}>
-                        Duplicate contact phone number.
-                      </div>
+                        <Trash2 size={13} strokeWidth={2.5} />
+                      </button>
                     )}
                   </div>
-                );
-              })}
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                    <input
+                      type="text"
+                      required
+                      placeholder="First Name"
+                      value={c.first_name}
+                      onChange={(e) => updateContact(idx, 'first_name', e.target.value)}
+                      style={{
+                        padding: '8px 10px',
+                        backgroundColor: 'var(--surface)',
+                        border: '1.5px solid var(--stroke)',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '13px',
+                        color: 'var(--text)',
+                        outline: 'none',
+                      }}
+                    />
+                    <input
+                      type="text"
+                      required
+                      placeholder="Last Name"
+                      value={c.last_name}
+                      onChange={(e) => updateContact(idx, 'last_name', e.target.value)}
+                      style={{
+                        padding: '8px 10px',
+                        backgroundColor: 'var(--surface)',
+                        border: '1.5px solid var(--stroke)',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '13px',
+                        color: 'var(--text)',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '8px' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        backgroundColor: 'var(--surface)',
+                        border: '1.5px solid var(--stroke)',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '0 8px',
+                      }}
+                    >
+                      <span style={{ fontSize: '12px', fontWeight: 700, marginRight: '4px' }}>+91</span>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="Mobile"
+                        value={c.phone}
+                        onChange={handleContactPhoneChange(idx)}
+                        style={{
+                          width: '100%',
+                          padding: '8px 0',
+                          border: 'none',
+                          outline: 'none',
+                          backgroundColor: 'transparent',
+                          color: 'var(--text)',
+                          fontSize: '13px',
+                        }}
+                      />
+                    </div>
+
+                    <select
+                      value={c.relationship}
+                      onChange={(e) => updateContact(idx, 'relationship', e.target.value)}
+                      style={{
+                        padding: '8px 6px',
+                        backgroundColor: 'var(--surface)',
+                        border: '1.5px solid var(--stroke)',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '12px',
+                        color: 'var(--text)',
+                        outline: 'none',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <option value="Parent">Parent</option>
+                      <option value="Guardian">Guardian</option>
+                      <option value="Sibling">Sibling</option>
+                      <option value="Friend">Friend</option>
+                      <option value="Counselor">Counselor</option>
+                    </select>
+                  </div>
+
+                  {/* Optional Email & Telegram */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
+                    <input
+                      type="email"
+                      placeholder="Email (optional)"
+                      value={c.email}
+                      onChange={(e) => updateContact(idx, 'email', e.target.value)}
+                      style={{
+                        padding: '6px 8px',
+                        backgroundColor: 'var(--surface)',
+                        border: '1px solid var(--stroke)',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '11px',
+                        color: 'var(--text)',
+                        outline: 'none',
+                      }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Telegram ID (opt)"
+                      value={c.telegram_chat_id}
+                      onChange={(e) => updateContact(idx, 'telegram_chat_id', e.target.value)}
+                      style={{
+                        padding: '6px 8px',
+                        backgroundColor: 'var(--surface)',
+                        border: '1px solid var(--stroke)',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '11px',
+                        color: 'var(--text)',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={isSubmitting}
-              className="hallmark-btn-primary"
-              style={{ width: '100%', padding: '14px', fontSize: '0.98rem' }}
+              style={{
+                width: '100%',
+                padding: '14px 20px',
+                borderRadius: 'var(--radius-pill)',
+                backgroundColor: 'var(--stroke)',
+                color: 'var(--bg)',
+                border: 'var(--border-width-control) solid var(--stroke)',
+                boxShadow: 'var(--shadow-hard)',
+                fontSize: '15px',
+                fontWeight: 700,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                opacity: isSubmitting ? 0.7 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                marginTop: '6px',
+              }}
             >
-              <span>{isSubmitting ? "Creating Profile..." : "Continue to Safe Space"}</span>
-              <ArrowRight size={17} />
+              <span>{isSubmitting ? 'Creating profile...' : 'Continue to Consent'}</span>
+              <ArrowRight size={16} strokeWidth={2.5} />
             </button>
           </form>
         )}
-
       </div>
     </div>
   );

@@ -1,24 +1,22 @@
-import React, { useState, useRef } from 'react';
-import { ShieldCheck, Info, HeartHandshake, EyeOff, AlertTriangle, ExternalLink, Lock } from 'lucide-react';
-
 /**
- * Yuva Saarthi Policy Disclosure & Consent Screen
- * Enforces reading safety policies before confirmation checkboxes unlock.
- * Completely free of PRD rule numbers (§3.4a, §5.2).
+ * Yuva Saarthi — Policy Disclosure & Consent Screen
+ * Phase 5 & 6: Mentions phone, SMS, Telegram, and Email multi-channel alerts.
+ * Flat pastel design tokens, solid strokes, zero gradients.
  */
+
+import React, { useState, useRef } from 'react';
+import { ShieldCheck, Info, HeartHandshake, EyeOff, AlertTriangle, ExternalLink } from 'lucide-react';
+
 export default function Consent({ userSession, onAccept, onNavigate, hasReadPolicies = false }) {
   const [policyAck, setPolicyAck] = useState(false);
   const [generalConsent, setGeneralConsent] = useState(false);
   const [hasScrolledToBottom, setHasScrolledToBottom] = useState(hasReadPolicies);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
   const scrollContainerRef = useRef(null);
 
   const handleScroll = () => {
     if (scrollContainerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
-      // If user scrolled within 30px of bottom, mark as read
       if (scrollTop + clientHeight >= scrollHeight - 30) {
         setHasScrolledToBottom(true);
       }
@@ -29,7 +27,7 @@ export default function Consent({ userSession, onAccept, onNavigate, hasReadPoli
     if (policyAck && generalConsent) {
       onAccept({
         policy_ack_at: new Date().toISOString(),
-        consent_given_at: new Date().toISOString()
+        consent_given_at: new Date().toISOString(),
       });
     }
   };
@@ -37,200 +35,243 @@ export default function Consent({ userSession, onAccept, onNavigate, hasReadPoli
   const isUnlocked = hasScrolledToBottom || hasReadPolicies;
 
   return (
-    <div style={{ maxWidth: '680px', margin: '30px auto', padding: '20px' }} className="animate-slideup">
-      <div className="glass-panel" style={{ padding: '36px 40px' }}>
-        
+    <div
+      style={{
+        maxWidth: '680px',
+        margin: '30px auto',
+        padding: '20px',
+        color: 'var(--text)',
+        fontFamily: 'var(--font-body)',
+      }}
+    >
+      <div
+        style={{
+          padding: '36px 32px',
+          backgroundColor: 'var(--surface)',
+          border: 'var(--border-width) solid var(--stroke)',
+          borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-hard)',
+        }}
+      >
         <header style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <div style={{ display: 'inline-flex', padding: '12px', borderRadius: '16px', background: 'rgba(59, 130, 246, 0.1)', marginBottom: '12px' }}>
-            <ShieldCheck size={42} color="var(--accent-blue)" />
+          <div
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: 'var(--radius-pill)',
+              backgroundColor: 'var(--lilac)',
+              border: 'var(--border-width) solid var(--stroke)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#16131F',
+              marginBottom: '12px',
+            }}
+          >
+            <ShieldCheck size={28} strokeWidth={2.5} />
           </div>
-          <h1 style={{ fontSize: '1.9rem', fontFamily: 'var(--font-display)', fontWeight: '800', marginBottom: '6px', color: 'var(--text-primary)' }}>
+          <h1 style={{ fontSize: '26px', fontFamily: 'var(--font-heading)', fontWeight: 800, marginBottom: '6px' }}>
             Safety Net, Not Surveillance
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.94rem' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
             Please scroll through and review our safety charter before starting your first session.
           </p>
         </header>
 
         {/* Scrollable Policy Viewer Box */}
-        <div 
+        <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
           style={{
-            maxHeight: '260px',
+            maxHeight: '280px',
             overflowY: 'auto',
             padding: '20px',
-            borderRadius: '12px',
-            background: 'rgba(15, 23, 42, 0.6)',
-            border: `1px solid ${isUnlocked ? 'var(--border-medium)' : 'rgba(59, 130, 246, 0.4)'}`,
+            borderRadius: 'var(--radius-md)',
+            backgroundColor: 'var(--surface-2)',
+            border: `var(--border-width) solid ${isUnlocked ? 'var(--stroke)' : 'var(--text-muted)'}`,
             display: 'flex',
             flexDirection: 'column',
-            gap: '20px',
-            marginBottom: '20px'
+            gap: '18px',
+            marginBottom: '20px',
           }}
         >
-          {/* Section 1: Confidentiality & Data Stored */}
-          <div style={{ display: 'flex', gap: '14px' }}>
-            <Info size={22} style={{ color: 'var(--accent-cyan)', flexShrink: 0, marginTop: '2px' }} />
+          {/* Section 1: Confidentiality */}
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <Info size={20} strokeWidth={2.5} style={{ color: 'var(--lilac)', flexShrink: 0, marginTop: '2px' }} />
             <div>
-              <h3 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '4px', color: 'var(--text-primary)' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '4px' }}>
                 What We Store & Keep Confidential
               </h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: '1.45' }}>
-                We securely store your encrypted conversation history, your emergency contact numbers, and a gentle rolling 150-word conversation summary. Your personal chat messages are private and never shared with emergency contacts, advertisers, or third parties.
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.5 }}>
+                We securely store your encrypted conversation history, your emergency contact numbers, and a gentle rolling conversation summary. Your personal chat messages are private and never shared with emergency contacts, advertisers, schools, or third parties.
               </p>
             </div>
           </div>
 
           {/* Section 2: Contact Flow Rules */}
-          <div style={{ display: 'flex', gap: '14px' }}>
-            <HeartHandshake size={22} style={{ color: 'var(--accent-blue)', flexShrink: 0, marginTop: '2px' }} />
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <HeartHandshake size={20} strokeWidth={2.5} style={{ color: 'var(--pink)', flexShrink: 0, marginTop: '2px' }} />
             <div>
-              <h3 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '4px', color: 'var(--text-primary)' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '4px' }}>
                 When We Reach Out to Emergency Contacts
               </h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: '1.45' }}>
-                If our safety system detects immediate, high-severity danger (such as active self-harm ideation), it alerts your designated emergency contacts sequentially via phone call so someone in your life can step in. <strong>They are never shown your chat transcripts.</strong>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.5 }}>
+                If our safety system detects immediate, high-severity danger (active self-harm ideation), it alerts your designated emergency contacts sequentially via phone call and SMS/Telegram/Email notifications so someone in your life can check in. <strong>They are never shown your chat transcripts.</strong>
               </p>
             </div>
           </div>
 
           {/* Section 3: Safe Haven Abuse Protection */}
-          <div style={{ 
-            display: 'flex', 
-            gap: '14px', 
-            background: 'rgba(59, 130, 246, 0.08)', 
-            padding: '14px', 
-            borderRadius: '10px', 
-            border: '1px solid rgba(59, 130, 246, 0.25)' 
-          }}>
-            <AlertTriangle size={22} style={{ color: 'var(--accent-cyan)', flexShrink: 0, marginTop: '2px' }} />
+          <div
+            style={{
+              display: 'flex',
+              gap: '12px',
+              backgroundColor: 'var(--coral)',
+              color: '#16131F',
+              padding: '12px 14px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1.5px solid var(--stroke)',
+            }}
+          >
+            <AlertTriangle size={20} strokeWidth={2.5} style={{ flexShrink: 0, marginTop: '2px' }} />
             <div>
-              <h3 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--accent-cyan)', marginBottom: '4px' }}>
-                The Safe Haven Abuse Protection Safeguard
+              <h3 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px' }}>
+                Safe Haven Abuse Protection Safeguard
               </h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: '1.45' }}>
-                If you disclose domestic violence, caregiver harm, or physical abuse, <strong>we will NOT alert your listed personal emergency contacts</strong>, as doing so might compromise your safety. Instead, the app connects you directly to national youth protection lines like Childline (1098) or KIRAN (1800-599-0019).
+              <p style={{ fontSize: '13px', lineHeight: 1.5 }}>
+                If you disclose domestic violence, caregiver harm, or physical abuse, <strong>we will NOT alert your listed personal emergency contacts</strong>, protecting you from retaliatory harm. Instead, the app connects you directly to national youth protection helplines like Childline (1098).
               </p>
             </div>
           </div>
 
           {/* Section 4: Data control */}
-          <div style={{ display: 'flex', gap: '14px' }}>
-            <EyeOff size={22} style={{ color: 'var(--text-muted)', flexShrink: 0, marginTop: '2px' }} />
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <EyeOff size={20} strokeWidth={2.5} style={{ color: 'var(--mint)', flexShrink: 0, marginTop: '2px' }} />
             <div>
-              <h3 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '4px', color: 'var(--text-primary)' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '4px' }}>
                 Full Data Control & Right to Erase
               </h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: '1.45' }}>
-                You have unconditional control over your private records. You can request instant session wiping or complete profile erasure at any time in settings.
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.5 }}>
+                You have unconditional control over your private records. You can delete individual conversations or bulk-delete past history at any time.
               </p>
             </div>
           </div>
 
-          <div style={{ textAlign: 'center', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
-            <span style={{ fontSize: '0.78rem', color: isUnlocked ? 'var(--accent-cyan)' : 'var(--text-muted)', fontWeight: '600' }}>
-              {isUnlocked ? "Policy review complete. Checkboxes unlocked below." : "Scroll to the bottom of this box to unlock checkboxes."}
+          <div style={{ textAlign: 'center', paddingTop: '8px', borderTop: '1px solid var(--stroke)' }}>
+            <span style={{ fontSize: '12px', color: isUnlocked ? 'var(--text)' : 'var(--text-muted)', fontWeight: 700 }}>
+              {isUnlocked
+                ? '✓ Charter review complete. Checkboxes unlocked below.'
+                : '↓ Scroll to the bottom of this box to unlock checkboxes.'}
             </span>
           </div>
         </div>
 
-        {/* Link to Dedicated Full Policies Page */}
-        <div style={{ textAlign: 'right', marginBottom: '22px' }}>
+        {/* Link to Dedicated Policies Page */}
+        <div style={{ textAlign: 'right', marginBottom: '20px' }}>
           <button
             type="button"
             onClick={() => onNavigate('policies')}
             style={{
               background: 'none',
               border: 'none',
-              color: 'var(--accent-cyan)',
+              color: 'var(--text)',
               cursor: 'pointer',
-              fontSize: '0.84rem',
+              fontSize: '13px',
+              fontWeight: 600,
+              textDecoration: 'underline',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '4px',
-              textDecoration: 'underline'
             }}
           >
-            <span>Read Full Safety Policies on Dedicated Page</span>
-            <ExternalLink size={13} />
+            <span>Read Complete Safety & Terms Document</span>
+            <ExternalLink size={12} strokeWidth={2.5} />
           </button>
         </div>
 
-        {/* Checkboxes Section (Locked until policy is read) */}
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '14px', 
-          borderTop: '1px solid var(--border-subtle)', 
-          paddingTop: '20px', 
-          marginBottom: '28px',
-          opacity: isUnlocked ? 1 : 0.6,
-          transition: 'opacity 0.2s ease'
-        }}>
-          {!isUnlocked && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-cyan)', fontSize: '0.82rem', marginBottom: '4px' }}>
-              <Lock size={14} />
-              <span>Please scroll through the policy box above or open the dedicated policy page to unlock confirmation.</span>
-            </div>
-          )}
-
-          <label style={{ display: 'flex', gap: '12px', cursor: isUnlocked ? 'pointer' : 'not-allowed', fontSize: '0.92rem', alignItems: 'flex-start' }}>
-            <input 
-              type="checkbox" 
+        {/* Checkboxes */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '24px' }}>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '10px',
+              cursor: isUnlocked ? 'pointer' : 'not-allowed',
+              opacity: isUnlocked ? 1 : 0.5,
+              fontSize: '14px',
+              lineHeight: 1.5,
+            }}
+          >
+            <input
+              type="checkbox"
+              disabled={!isUnlocked}
               checked={policyAck}
-              disabled={!isUnlocked}
               onChange={(e) => setPolicyAck(e.target.checked)}
-              style={{ width: '18px', height: '18px', accentColor: 'var(--accent-blue)', marginTop: '2px', cursor: isUnlocked ? 'pointer' : 'not-allowed' }}
+              style={{
+                width: '18px',
+                height: '18px',
+                accentColor: 'var(--stroke)',
+                cursor: isUnlocked ? 'pointer' : 'not-allowed',
+                marginTop: '2px',
+              }}
             />
-            <span style={{ color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-              I have reviewed the safety policies, including the <strong>Abuse Protection Safeguard</strong> and emergency escalation protocols.
+            <span>
+              I understand that Yuva Saarthi notifies my designated emergency contacts via calls and notifications <strong>only</strong> during acute self-harm crises, and that abuse disclosures are strictly shielded.
             </span>
           </label>
 
-          <label style={{ display: 'flex', gap: '12px', cursor: isUnlocked ? 'pointer' : 'not-allowed', fontSize: '0.92rem', alignItems: 'flex-start' }}>
-            <input 
-              type="checkbox" 
-              checked={generalConsent}
-              disabled={!isUnlocked}
-              onChange={(e) => setGeneralConsent(e.target.checked)}
-              style={{ width: '18px', height: '18px', accentColor: 'var(--accent-cyan)', marginTop: '2px', cursor: isUnlocked ? 'pointer' : 'not-allowed' }}
-            />
-            <span style={{ color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-              I consent to the Yuva Saarthi safety agreement and agree to prioritize my well-being.
-            </span>
-          </label>
-        </div>
-
-        {error && (
-          <div style={{ color: '#f87171', marginBottom: '16px', textAlign: 'center', fontSize: '0.88rem' }}>
-            {error}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <button 
-            onClick={() => onNavigate('signup')} 
-            style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.88rem' }}
-          >
-            Back to Sign Up
-          </button>
-          
-          <button 
-            onClick={handleProceed}
-            disabled={!policyAck || !generalConsent || loading}
-            className="hallmark-btn-primary"
-            style={{ 
-              padding: '12px 26px', 
-              borderRadius: '8px', 
-              opacity: (!policyAck || !generalConsent || loading) ? 0.45 : 1,
-              cursor: (!policyAck || !generalConsent || loading) ? 'not-allowed' : 'pointer'
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '10px',
+              cursor: isUnlocked ? 'pointer' : 'not-allowed',
+              opacity: isUnlocked ? 1 : 0.5,
+              fontSize: '14px',
+              lineHeight: 1.5,
             }}
           >
-            {loading ? 'Processing...' : 'I Accept & Continue'}
-          </button>
+            <input
+              type="checkbox"
+              disabled={!isUnlocked}
+              checked={generalConsent}
+              onChange={(e) => setGeneralConsent(e.target.checked)}
+              style={{
+                width: '18px',
+                height: '18px',
+                accentColor: 'var(--stroke)',
+                cursor: isUnlocked ? 'pointer' : 'not-allowed',
+                marginTop: '2px',
+              }}
+            />
+            <span>
+              I consent to processing my messages to receive supportive, empathetic conversational guidance with Yusa.
+            </span>
+          </label>
         </div>
 
+        {/* Action Button */}
+        <button
+          type="button"
+          disabled={!policyAck || !generalConsent}
+          onClick={handleProceed}
+          style={{
+            width: '100%',
+            padding: '14px 20px',
+            borderRadius: 'var(--radius-pill)',
+            backgroundColor: 'var(--stroke)',
+            color: 'var(--bg)',
+            border: 'var(--border-width-control) solid var(--stroke)',
+            boxShadow: policyAck && generalConsent ? 'var(--shadow-hard)' : 'none',
+            fontSize: '15px',
+            fontWeight: 700,
+            cursor: policyAck && generalConsent ? 'pointer' : 'not-allowed',
+            opacity: policyAck && generalConsent ? 1 : 0.45,
+            transition: 'transform var(--transition-fast)',
+          }}
+        >
+          Accept & Enter Chat
+        </button>
       </div>
     </div>
   );

@@ -1,6 +1,8 @@
-// YUVAA Saarthi Main Application Container
-// Theme: Pink & Purple Youth Mental Health Companion (Tasks 5, 8, 9, 10, 11)
-// Featuring Landing Page, Animated Yusa Mascot, Smooth Navigations & Real Emergency Escalation
+/**
+ * Yuva Saarthi — Main Application Container
+ * Phase 6: Flat pastel design system, zero gradients, solid strokes.
+ * Pure SVG Yusa, Theme toggle, resilient navigation and state management.
+ */
 
 import React, { useState, useEffect } from 'react';
 import LandingPage from './pages/LandingPage.jsx';
@@ -9,29 +11,23 @@ import Consent from './pages/Consent.jsx';
 import OtpVerification from './pages/OtpVerification.jsx';
 import Chat from './pages/Chat.jsx';
 import PoliciesPage from './pages/PoliciesPage.jsx';
-import BrainLogo from './components/BrainLogo.jsx';
-import PolicyModal from './components/PolicyModal.jsx';
-import ContactsDrawer from './components/ContactsDrawer.jsx';
-import { Shield, Users, LogOut, Sparkles, MessageCircle, Home } from 'lucide-react';
-import axios from 'axios';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import ThemeToggle from './components/ThemeToggle.jsx';
+import { Shield, Users, LogOut, MessageCircle, Home } from 'lucide-react';
+import apiClient, { pingBackendWarmup } from './api/client.js';
 
 export default function App() {
-  // Session persistence across page reloads
   const [userSession, setUserSession] = useState(() => {
     try {
-      const saved = localStorage.getItem('yuvaa_user_session');
+      const saved = localStorage.getItem('user_session') || localStorage.getItem('yuvaa_user_session');
       return saved ? JSON.parse(saved) : null;
     } catch (e) {
       return null;
     }
   });
 
-  // Default to landing page if not logged in (Task 5)
   const [currentPage, setCurrentPage] = useState(() => {
     try {
-      const saved = localStorage.getItem('yuvaa_user_session');
+      const saved = localStorage.getItem('user_session') || localStorage.getItem('yuvaa_user_session');
       return saved ? 'chat' : 'landing';
     } catch (e) {
       return 'landing';
@@ -40,40 +36,25 @@ export default function App() {
 
   const [previousPage, setPreviousPage] = useState('landing');
   const [hasReadPolicies, setHasReadPolicies] = useState(false);
-  const [isPolicyOpen, setIsPolicyOpen] = useState(false);
-  const [isContactsOpen, setIsContactsOpen] = useState(false);
-  const [emergencyContacts, setEmergencyContacts] = useState([]);
+  const [warmupStatus, setWarmupStatus] = useState('checking');
 
-  // Sync session changes to localStorage
+  // Ping backend on app boot to wake up cold-start server
+  useEffect(() => {
+    pingBackendWarmup((status) => {
+      setWarmupStatus(status);
+    });
+  }, []);
+
+  // Sync user session to localStorage
   useEffect(() => {
     if (userSession) {
-      localStorage.setItem('yuvaa_user_session', JSON.stringify(userSession));
+      const serialized = JSON.stringify(userSession);
+      localStorage.setItem('user_session', serialized);
+      localStorage.setItem('yuvaa_user_session', serialized);
     } else {
+      localStorage.removeItem('user_session');
       localStorage.removeItem('yuvaa_user_session');
     }
-  }, [userSession]);
-
-  // Fetch emergency contacts whenever userSession is active
-  useEffect(() => {
-    if (!userSession) return;
-    const fetchContacts = async () => {
-      try {
-        const token = userSession.access_token || userSession.session_id;
-        const headers = {};
-        if (token && token.length > 20) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        headers['X-Dev-User-Id'] = userSession.user_id || '00000000-0000-0000-0000-000000000001';
-
-        const res = await axios.get(`${API_BASE_URL}/contacts`, { headers, timeout: 3000 });
-        if (Array.isArray(res.data)) {
-          setEmergencyContacts(res.data);
-        }
-      } catch (err) {
-        console.debug("Could not load contacts in App root:", err);
-      }
-    };
-    fetchContacts();
   }, [userSession]);
 
   const handleSignupComplete = (data) => {
@@ -82,29 +63,28 @@ export default function App() {
   };
 
   const handleConsentAccept = (consentTimestamps) => {
-    setUserSession(prev => ({
+    setUserSession((prev) => ({
       ...prev,
-      ...consentTimestamps
+      ...consentTimestamps,
     }));
     setCurrentPage('chat');
   };
 
   const handleOtpVerify = (sessionId) => {
-    setUserSession(prev => ({
+    setUserSession((prev) => ({
       ...prev,
       session_id: sessionId,
       access_token: sessionId,
-      is_verified: true
+      is_verified: true,
     }));
     setCurrentPage('chat');
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('user_session');
     localStorage.removeItem('yuvaa_user_session');
     setUserSession(null);
     setCurrentPage('landing');
-    setIsContactsOpen(false);
-    setIsPolicyOpen(false);
   };
 
   const handleOpenPoliciesPage = () => {
@@ -112,234 +92,244 @@ export default function App() {
     setCurrentPage('policies');
   };
 
+  // If in chat, Chat component provides its own full viewport layout
+  if (currentPage === 'chat') {
+    return <Chat />;
+  }
+
   return (
-    <div style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)' }}>
-      
-      {/* ── CLEAN TOP NAVBAR (Pink & Purple Palette, Task 9) ── */}
-      <nav style={{ 
-        background: 'rgba(255, 255, 255, 0.75)', 
-        backdropFilter: 'blur(16px)',
-        borderBottom: '1px solid rgba(168, 85, 247, 0.15)',
-        padding: '10px 24px',
+    <div
+      style={{
+        minHeight: '100dvh',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-      }}>
-        {/* Left: Logo + Brand Wordmark */}
-        <div 
+        flexDirection: 'column',
+        backgroundColor: 'var(--bg)',
+        color: 'var(--text)',
+        fontFamily: 'var(--font-body)',
+      }}
+    >
+      {/* ── TOP NAVBAR ── */}
+      <nav
+        style={{
+          backgroundColor: 'var(--surface)',
+          borderBottom: 'var(--border-width) solid var(--stroke)',
+          padding: '12px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
+        }}
+      >
+        {/* Brand */}
+        <div
           onClick={() => setCurrentPage(userSession ? 'chat' : 'landing')}
-          style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
           title="Yuva Saarthi Home"
         >
-          <BrainLogo size={34} />
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ 
-              fontSize: '1.25rem', 
-              fontFamily: 'var(--font-display)', 
-              fontWeight: '900', 
-              letterSpacing: '-0.02em',
-              lineHeight: 1.15,
-              color: '#2e1065'
-            }}>
-              Yuva <span style={{ color: '#db2777' }}>Saarthi</span>
-            </span>
-            <span style={{ fontSize: '0.66rem', color: '#9333ea', letterSpacing: '0.04em', fontWeight: '700', textTransform: 'uppercase' }}>
+          <div
+            style={{
+              width: '34px',
+              height: '34px',
+              borderRadius: 'var(--radius-pill)',
+              backgroundColor: 'var(--lilac)',
+              border: '2px solid var(--stroke)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 800,
+              fontSize: '14px',
+              color: '#16131F',
+              fontFamily: 'var(--font-heading)',
+            }}
+          >
+            YS
+          </div>
+          <div>
+            <div
+              style={{
+                fontSize: '18px',
+                fontFamily: 'var(--font-heading)',
+                fontWeight: 800,
+                lineHeight: 1.1,
+                color: 'var(--text)',
+              }}
+            >
+              Yuva Saarthi
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>
               Youth Well-Being Companion
-            </span>
+            </div>
           </div>
         </div>
 
-        {/* Right: Purposeful Navigation Controls */}
+        {/* Navigation Controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          
-          {/* If NOT logged in: Show landing nav links */}
           {!userSession && (
             <>
               <button
+                type="button"
                 onClick={() => setCurrentPage('landing')}
-                className="hallmark-btn-secondary"
-                style={{ 
-                  padding: '7px 14px', 
-                  fontSize: '0.84rem', 
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 'var(--radius-pill)',
+                  border: '1.5px solid var(--stroke)',
+                  backgroundColor: currentPage === 'landing' ? 'var(--lilac)' : 'var(--surface)',
+                  color: currentPage === 'landing' ? '#16131F' : 'var(--text)',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
                   gap: '6px',
-                  background: currentPage === 'landing' ? '#fdf2f8' : 'rgba(255, 255, 255, 0.85)',
-                  borderColor: currentPage === 'landing' ? '#f472b6' : 'rgba(168, 85, 247, 0.18)',
-                  color: currentPage === 'landing' ? '#ec4899' : '#581c87'
                 }}
               >
-                <Home size={14} />
-                <span>About</span>
+                <Home size={14} strokeWidth={2.5} />
+                <span className="hide-on-mobile">About</span>
               </button>
 
               <button
+                type="button"
                 onClick={handleOpenPoliciesPage}
-                className="hallmark-btn-secondary"
-                style={{ padding: '7px 14px', fontSize: '0.84rem', gap: '6px' }}
-                title="View Safety & Confidentiality Policies"
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 'var(--radius-pill)',
+                  border: '1.5px solid var(--stroke)',
+                  backgroundColor: 'var(--surface)',
+                  color: 'var(--text)',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
               >
-                <Shield size={14} color="#a855f7" />
-                <span>Safety Policies</span>
+                <Shield size={14} strokeWidth={2.5} />
+                <span className="hide-on-mobile">Safety Charter</span>
               </button>
 
               <button
+                type="button"
                 onClick={() => setCurrentPage('signup')}
-                className="hallmark-btn-primary"
-                style={{ padding: '8px 18px', fontSize: '0.84rem', gap: '6px' }}
+                style={{
+                  padding: '7px 16px',
+                  borderRadius: 'var(--radius-pill)',
+                  border: 'var(--border-width-control) solid var(--stroke)',
+                  backgroundColor: 'var(--stroke)',
+                  color: 'var(--bg)',
+                  boxShadow: 'var(--shadow-hard-sm)',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
               >
-                <MessageCircle size={15} />
+                <MessageCircle size={15} strokeWidth={2.5} />
                 <span>Chat with Yusa</span>
               </button>
             </>
           )}
 
-          {/* If LOGGED IN: Show Safety, Contacts & Logout */}
           {userSession && (
             <>
               <button
-                onClick={handleOpenPoliciesPage}
-                className="hallmark-btn-secondary"
-                style={{ padding: '7px 14px', fontSize: '0.82rem', gap: '6px' }}
-                title="View Safety & Confidentiality Policies"
-              >
-                <Shield size={14} color="#ec4899" />
-                <span>Safety Policies</span>
-              </button>
-
-              <button
-                onClick={() => setIsContactsOpen(true)}
-                className="hallmark-btn-secondary"
-                style={{ padding: '7px 14px', fontSize: '0.82rem', gap: '6px' }}
-                title="View Emergency Contacts"
-              >
-                <Users size={14} color="#a855f7" />
-                <span>Contacts ({emergencyContacts.length})</span>
-              </button>
-
-              <button
-                onClick={handleLogout}
+                type="button"
+                onClick={() => setCurrentPage('chat')}
                 style={{
-                  padding: '7px 14px',
-                  fontSize: '0.82rem',
-                  fontWeight: '700',
-                  fontFamily: 'inherit',
+                  padding: '7px 16px',
+                  borderRadius: 'var(--radius-pill)',
+                  border: 'var(--border-width-control) solid var(--stroke)',
+                  backgroundColor: 'var(--stroke)',
+                  color: 'var(--bg)',
+                  boxShadow: 'var(--shadow-hard-sm)',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  background: '#fdf2f8',
-                  border: '1px solid #fbcfe8',
-                  borderRadius: 'var(--radius-pill)',
-                  color: '#be185d',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
                 }}
-                title="Sign Out"
-                onMouseEnter={e => { e.currentTarget.style.background = '#fce7f3'; e.currentTarget.style.borderColor = '#f472b6'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = '#fdf2f8'; e.currentTarget.style.borderColor = '#fbcfe8'; }}
               >
-                <LogOut size={14} />
+                <MessageCircle size={15} strokeWidth={2.5} />
+                <span>Back to Chat</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 'var(--radius-pill)',
+                  border: '1.5px solid var(--stroke)',
+                  backgroundColor: 'var(--coral)',
+                  color: '#16131F',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <LogOut size={14} strokeWidth={2.5} />
                 <span>Sign Out</span>
               </button>
             </>
           )}
+
+          <ThemeToggle compact />
         </div>
       </nav>
 
-      {/* ── MAIN CONTENT WORKSPACE WITH SMOOTH PAGE TRANSITIONS (Task 10) ── */}
-      <main style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto' }}>
-        
+      {/* ── MAIN CONTENT ── */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         {currentPage === 'landing' && (
-          <div key="landing" className="page-transition">
-            <LandingPage 
-              onGetStarted={() => setCurrentPage('signup')}
-              onLogin={() => setCurrentPage('signup')}
-              onOpenPolicies={handleOpenPoliciesPage}
+          <LandingPage
+            onGetStarted={() => setCurrentPage('signup')}
+            onLogin={() => setCurrentPage('signup')}
+            onOpenPolicies={handleOpenPoliciesPage}
+            onComplete={handleSignupComplete}
+          />
+        )}
+
+        {currentPage === 'signup' && (
+          <div style={{ padding: '24px 20px', maxWidth: '1020px', margin: '0 auto', width: '100%' }}>
+            <Signup
               onComplete={handleSignupComplete}
+              onNavigate={(page) => setCurrentPage(page)}
+              onBackToLanding={() => setCurrentPage('landing')}
             />
           </div>
+        )}
+
+        {currentPage === 'consent' && (
+          <Consent
+            userSession={userSession}
+            onAccept={handleConsentAccept}
+            onNavigate={(page) => setCurrentPage(page)}
+            hasReadPolicies={hasReadPolicies}
+          />
+        )}
+
+        {currentPage === 'otp' && (
+          <OtpVerification
+            userSession={userSession}
+            onVerify={handleOtpVerify}
+            onNavigate={(page) => setCurrentPage(page)}
+          />
         )}
 
         {currentPage === 'policies' && (
-          <div key="policies" className="page-transition" style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-            <PoliciesPage 
-              onBack={() => setCurrentPage(previousPage || (userSession ? 'chat' : 'landing'))}
-              onMarkAsRead={() => setHasReadPolicies(true)}
-            />
-          </div>
-        )}
-
-        {currentPage === 'chat' && userSession && (
-          <div key="chat" className="page-transition" style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <Chat 
-              userSession={userSession} 
-              onLogout={handleLogout}
-              onOpenContacts={() => setIsContactsOpen(true)}
-              onOpenPolicy={handleOpenPoliciesPage}
-              emergencyContacts={emergencyContacts}
-            />
-          </div>
-        )}
-
-        {['signup', 'consent', 'otp'].includes(currentPage) && (
-          <div 
-            key={currentPage} 
-            className="page-transition" 
-            style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', overflowY: 'auto' }}
-          >
-            {currentPage === 'signup' && (
-              <Signup 
-                onComplete={handleSignupComplete} 
-                onNavigate={(page) => {
-                  if (page === 'policies') {
-                    handleOpenPoliciesPage();
-                  } else {
-                    setCurrentPage(page);
-                  }
-                }} 
-              />
-            )}
-            
-            {currentPage === 'consent' && (
-              <Consent 
-                userSession={userSession}
-                hasReadPolicies={hasReadPolicies}
-                onAccept={handleConsentAccept} 
-                onNavigate={(page) => {
-                  if (page === 'policies') {
-                    handleOpenPoliciesPage();
-                  } else {
-                    setCurrentPage(page);
-                  }
-                }} 
-              />
-            )}
-
-            {currentPage === 'otp' && (
-              <OtpVerification 
-                userSession={userSession}
-                onVerify={handleOtpVerify}
-                onNavigate={(page) => setCurrentPage(page)} 
-              />
-            )}
-          </div>
+          <PoliciesPage
+            onBack={() => setCurrentPage(previousPage || 'landing')}
+            onMarkAsRead={() => setHasReadPolicies(true)}
+          />
         )}
       </main>
-
-      {/* Policy Modal (quick reference overlay) */}
-      <PolicyModal 
-        isOpen={isPolicyOpen} 
-        onClose={() => setIsPolicyOpen(false)} 
-      />
-
-      {/* Emergency Contacts Slide-out Drawer */}
-      <ContactsDrawer 
-        isOpen={isContactsOpen} 
-        onClose={() => setIsContactsOpen(false)} 
-        contacts={emergencyContacts}
-      />
-
     </div>
   );
 }
