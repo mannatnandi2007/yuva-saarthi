@@ -12,10 +12,10 @@ app = FastAPI(
     version="1.1.0"
 )
 
-# CORS middleware for React frontend integration
+# Phase 8: Strict CORS middleware for Web & Native Capacitor clients
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Update with frontend Vercel deployment URL in production (PRD §4)
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -32,6 +32,7 @@ from app.services.chat_service import (
     delete_all_sessions,
     delete_sessions_batch,
 )
+from app.middleware.rate_limit import chat_rate_limiter
 
 logger = logging.getLogger(__name__)
 
@@ -205,6 +206,7 @@ def batch_delete_sessions(
     response_model=ChatResponse,
     status_code=status.HTTP_200_OK,
     summary="Send a message and receive an AI response",
+    dependencies=[Depends(chat_rate_limiter)],
 )
 async def chat(
     payload: ChatRequest,

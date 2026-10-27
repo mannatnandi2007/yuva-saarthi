@@ -80,9 +80,12 @@ async def get_current_user(
       HTTP 401 if token validation fails at all levels.
     """
     # -----------------------------------------------------------------------
-    # 1. Dev bypass — only active when explicitly configured
+    # 1. Dev bypass — only active when explicitly configured outside production
     # -----------------------------------------------------------------------
-    dev_bypass = os.environ.get("DEV_BYPASS_AUTH", "false").lower() == "true"
+    dev_bypass = (
+        settings.environment.lower() != "production"
+        and (os.environ.get("DEV_BYPASS_AUTH", "false").lower() == "true" or settings.dev_bypass_auth)
+    )
     if dev_bypass:
         if x_dev_user_id:
             logger.debug("[DEV BYPASS] Accepting X-Dev-User-Id: %s", x_dev_user_id)

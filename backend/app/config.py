@@ -55,6 +55,34 @@ class Settings(BaseSettings):
     email_api_key: Optional[str] = None
     email_from: str = "alerts@yuvasaarthi.in"
 
+    # Phase 8: Security, Rate Limiting & Environment Config
+    environment: str = "development"  # "development", "staging", "production"
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000,capacitor://localhost,https://localhost"
+    rate_limit_per_minute: int = 30
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        if not self.cors_origins or self.cors_origins.strip() == "*":
+            return ["*"]
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    def validate_production_security(self):
+        """Phase 8: Security checks for production environments."""
+        if self.environment.lower() == "production":
+            default_secrets = [
+                "yuva-saarthi-default-dev-secret-change-in-production",
+                "yuvaa-secret-key-change-in-production-2026",
+                "secret",
+                "changeme",
+            ]
+            if not self.jwt_secret or self.jwt_secret in default_secrets or len(self.jwt_secret) < 32:
+                raise ValueError(
+                    "CRITICAL: Production deployment detected with insecure or default JWT_SECRET. "
+                    "A secure, randomly generated 32+ character JWT_SECRET is required."
+                )
+            if self.dev_bypass_auth:
+                raise ValueError("CRITICAL: DEV_BYPASS_AUTH must be False in production.")
+
     # Settings configurations to read from .env if present
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -63,6 +91,7 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
+settings.validate_production_security()
 
 # ---------------------------------------------------------------------------
 # Sane Circuit Breaker for LLM Providers (Phase 2)
