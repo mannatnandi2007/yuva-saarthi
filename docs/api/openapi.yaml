@@ -1,0 +1,266 @@
+openapi: 3.1.0
+info:
+  title: Yuva Saarthi API
+  description: Youth companionship expansion and wellbeing dashboard API specification for Yuva Saarthi.
+  version: 2.0.0
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+paths:
+  /api/chat/message:
+    post:
+      summary: Send a chat message
+      operationId: sendChatMessage
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatMessageRequest'
+      responses:
+        '200':
+          description: Successful response from Yuva Saarthi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessageResponse'
+  /api/dashboard/summary:
+    get:
+      summary: Retrieve current wellbeing summary and streaks
+      operationId: getDashboardSummary
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Dashboard overview payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummary'
+  /api/dashboard/trends:
+    get:
+      summary: Retrieve historical mood and interaction trends
+      operationId: getDashboardTrends
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 7
+      responses:
+        '200':
+          description: Historical trends payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardTrends'
+  /api/profile/me:
+    get:
+      summary: Get user profile memory (What Yusa knows about me)
+      operationId: getProfileMemory
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User memory breakdown
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileMemory'
+  /api/profile/fact/{fact_id}:
+    delete:
+      summary: Delete a specific memory item
+      operationId: deleteProfileFact
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: fact_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Fact deleted successfully
+  /api/profile/reset:
+    post:
+      summary: Reset and wipe all profile memories
+      operationId: resetProfileMemory
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Profile memories wiped
+  /api/features:
+    get:
+      summary: Fetch dynamic feature flags and domain status
+      operationId: getFeatureFlags
+      responses:
+        '200':
+          description: Active feature flags
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureFlagsResponse'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ChatMessageRequest:
+      type: object
+      required:
+        - message
+      properties:
+        session_id:
+          type: string
+          nullable: true
+        message:
+          type: string
+        client_timestamp:
+          type: string
+          format: date-time
+    ChatMessageResponse:
+      type: object
+      required:
+        - reply
+        - session_id
+        - mood
+        - domains
+      properties:
+        reply:
+          type: string
+        session_id:
+          type: string
+        mood:
+          type: string
+          enum: [normal, happy, overjoyed, sad, angry, anxious, tired]
+        mood_confidence:
+          type: number
+        domains:
+          type: array
+          items:
+            type: string
+        is_hybrid:
+          type: boolean
+        citations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Citation'
+        degraded:
+          type: boolean
+    Citation:
+      type: object
+      required:
+        - source_name
+      properties:
+        source_name:
+          type: string
+        excerpt:
+          type: string
+        url:
+          type: string
+          nullable: true
+    DashboardSummary:
+      type: object
+      required:
+        - wellbeing_score
+        - current_mood
+        - streak_days
+        - yusa_pose
+      properties:
+        wellbeing_score:
+          type: number
+        current_mood:
+          type: string
+        streak_days:
+          type: integer
+        yusa_pose:
+          type: string
+          enum: [normal, meditating, thoughtful, celebrating, supportive]
+        reflection_prompt:
+          type: string
+        coping_tools_suggested:
+          type: array
+          items:
+            type: string
+    DashboardTrends:
+      type: object
+      required:
+        - timeline
+        - domain_breakdown
+      properties:
+        timeline:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+              valence:
+                type: number
+              dominant_emotion:
+                type: string
+        domain_breakdown:
+          type: object
+          additionalProperties:
+            type: number
+    ProfileMemory:
+      type: object
+      required:
+        - facts
+        - preferences
+        - goals
+        - boundaries
+      properties:
+        facts:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemoryItem'
+        preferences:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemoryItem'
+        goals:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemoryItem'
+        boundaries:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemoryItem'
+    MemoryItem:
+      type: object
+      required:
+        - id
+        - content
+        - recorded_at
+      properties:
+        id:
+          type: string
+        content:
+          type: string
+        recorded_at:
+          type: string
+          format: date-time
+    FeatureFlagsResponse:
+      type: object
+      required:
+        - domains_enabled
+        - dashboard_enabled
+        - checkin_calls_enabled
+      properties:
+        domains_enabled:
+          type: array
+          items:
+            type: string
+        dashboard_enabled:
+          type: boolean
+        checkin_calls_enabled:
+          type: boolean

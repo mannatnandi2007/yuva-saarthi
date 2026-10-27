@@ -1,0 +1,48 @@
+# Yuva Saarthi — CODEOWNERS
+# Ownership mappings across tracks. Safety-critical files require Mannat's review.
+
+# Default fallback
+* @mannat
+
+# Track A: UI & Frontend Features (Khushal)
+frontend/src/pages/Dashboard.jsx @khushal
+frontend/src/pages/ProfileView.jsx @khushal
+frontend/src/pages/ConsentExpansion.jsx @khushal
+frontend/src/components/dashboard/ @khushal
+frontend/src/components/Yusa3D.jsx @khushal @mannat
+frontend/src/components/YusaCompanion.jsx @khushal @mannat
+
+# Track B: RAG Ingestion, Database & Auth (Aakansha)
+supabase/ @aakansha
+backend/app/core/database.py @aakansha
+backend/app/core/dependencies.py @aakansha
+backend/app/services/knowledge_store.py @aakansha @mannat
+backend/scripts/kb.py @aakansha
+knowledge/ @aakansha
+
+# Track C: RAG Pipelines & Backend Intelligence (Mannat) - Safety Critical
+backend/prompts/ @mannat
+backend/app/services/prompt_service.py @mannat
+backend/app/services/safety_gate.py @mannat
+backend/app/services/router.py @mannat
+backend/app/services/retrieval.py @mannat
+backend/app/services/reflector.py @mannat
+backend/app/services/drift_check.py @mannat
+backend/app/services/session_health.py @mannat
+backend/app/services/wellbeing_service.py @mannat
+backend/app/routers/dashboard.py @mannat
+backend/app/routers/profile.py @mannat
+evals/ @mannat
+docs/api/openapi.yaml @mannat
+
+# Track D: Bland Call Scheduling (Aklesh)
+backend/app/services/bland_ai.py @aklesh @mannat
+backend/app/services/call_scheduler.py @aklesh @mannat
+backend/app/services/call_queue.py @aklesh @mannat
+docs/bland-calls.md @aklesh
+
+# Track E: Android Dev & Dynamic API Calling (Manthan)
+frontend/capacitor.config.json @manthan
+frontend/src/api/generatedClient.js @manthan
+frontend/src/config/ @manthan
+docs/android-build.md @manthan
