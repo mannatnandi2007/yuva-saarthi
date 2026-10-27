@@ -57,7 +57,7 @@ class Settings(BaseSettings):
 
     # Phase 8: Security, Rate Limiting & Environment Config
     environment: str = "development"  # "development", "staging", "production"
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000,capacitor://localhost,https://localhost"
+    cors_origins: str = "http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174,http://localhost:3000,http://127.0.0.1:3000,capacitor://localhost,https://localhost"
     rate_limit_per_minute: int = 30
 
     @property

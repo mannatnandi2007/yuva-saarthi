@@ -196,7 +196,12 @@ export default function Signup({
         onNavigate('consent');
       }
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Registration failed. Please check details and try again.';
+      let msg = err.response?.data?.detail;
+      if (Array.isArray(msg)) {
+        msg = msg.map((m) => m.msg || JSON.stringify(m)).join('; ');
+      } else if (typeof msg !== 'string' || !msg.trim()) {
+        msg = err.response?.data?.message || err.message || 'Registration failed. Please check details and try again.';
+      }
       setError(msg);
     } finally {
       setIsSubmitting(false);
